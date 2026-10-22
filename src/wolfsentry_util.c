@@ -365,7 +365,7 @@ _Pragma("GCC diagnostic pop");
 
 #endif /* WOLFSENTRY_ERROR_STRINGS */
 
-#if defined(WOLFSENTRY_PROTOCOL_NAMES) || !defined(WOLFSENTRY_NO_JSON)
+#if defined(WOLFSENTRY_PROTOCOL_NAMES) || !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_WOLFCOSE)
 
 static const struct {
     wolfsentry_action_res_t res;
@@ -437,7 +437,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_action_res_assoc_by_name(const ch
     WOLFSENTRY_ERROR_RETURN(ITEM_NOT_FOUND);
 }
 
-#endif /* WOLFSENTRY_PROTOCOL_NAMES || !WOLFSENTRY_NO_JSON */
+#endif /* WOLFSENTRY_PROTOCOL_NAMES || !WOLFSENTRY_NO_JSON || WOLFSENTRY_WOLFCOSE */
 
 WOLFSENTRY_API struct wolfsentry_build_settings wolfsentry_get_build_settings(void) {
     return wolfsentry_build_settings;

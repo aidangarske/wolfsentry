@@ -3970,7 +3970,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
         WOLFSENTRY_ERROR_RETURN(OP_NOT_SUPP_FOR_PROTO);
 }
 
-#if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON)
+#if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_WOLFCOSE)
 
 struct wolfsentry_route_flag_name_map_ent {
     const wolfsentry_route_flags_t flag;
@@ -4021,7 +4021,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_flag_assoc_by_name(const ch
     WOLFSENTRY_ERROR_RETURN(ITEM_NOT_FOUND);
 }
 
-#endif /* WOLFSENTRY_PROTOCOL_NAMES || WOLFSENTRY_JSON_DUMP_UTILS || !WOLFSENTRY_NO_JSON */
+#endif /* WOLFSENTRY_PROTOCOL_NAMES || WOLFSENTRY_JSON_DUMP_UTILS || !WOLFSENTRY_NO_JSON || WOLFSENTRY_WOLFCOSE */
 
 /* note this rendering routine has no dependence on centijson and other
  * facilities implemented in src/json/, nor even on stdio -- it is available

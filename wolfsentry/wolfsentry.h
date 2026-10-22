@@ -1309,7 +1309,7 @@ WOLFSENTRY_API struct wolfsentry_allocator *wolfsentry_get_allocator(struct wolf
 
 /*! @} */
 
-#if defined(WOLFSENTRY_PROTOCOL_NAMES) || !defined(WOLFSENTRY_NO_JSON)
+#if defined(WOLFSENTRY_PROTOCOL_NAMES) || !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_WOLFCOSE)
 /*! \addtogroup wolfsentry_action
  * @{
  */
@@ -2498,7 +2498,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_format_address(
     int *buflen);
     /*!< \brief Render a binary address in human-readable form to a buffer */
 
-#if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON)
+#if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_WOLFCOSE)
 
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_flag_assoc_by_flag(
     wolfsentry_route_flags_t flag,
@@ -2511,7 +2511,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_route_flag_assoc_by_name(
     wolfsentry_route_flags_t *flag);
     /*!< \brief Retrieve the numeric value of a route flag, given its name. */
 
-#endif /* WOLFSENTRY_PROTOCOL_NAMES || WOLFSENTRY_JSON_DUMP_UTILS || !WOLFSENTRY_NO_JSON */
+#endif /* WOLFSENTRY_PROTOCOL_NAMES || WOLFSENTRY_JSON_DUMP_UTILS || !WOLFSENTRY_NO_JSON || WOLFSENTRY_WOLFCOSE */
 
 #if !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_JSON_DUMP_UTILS)
 

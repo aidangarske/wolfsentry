@@ -178,6 +178,7 @@ jobs:
           - no-transactions
           - no-legacy-event-syntax
           - no-error-messages
+          - no-protocol-names
           - no-text-numbers
           - no-text-addresses
           - minimal
