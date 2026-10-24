@@ -124,7 +124,12 @@ jobs:
         cd /opt/wolfsentry-deps
         retry git clone --depth 1 --branch "$WOLFSSL_REF" \
           https://github.com/wolfSSL/wolfssl.git wolfssl
-        retry git clone --depth 1 https://github.com/wolfSSL/wolfCOSE.git wolfCOSE
+        WOLFCOSE_TAGS=$(retry git ls-remote --tags --refs \
+          https://github.com/wolfSSL/wolfCOSE.git 'v*')
+        WOLFCOSE_REF=$(awk -F/ '{print $NF}' <<<"$WOLFCOSE_TAGS" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+        test -n "$WOLFCOSE_REF"
+        retry git clone --depth 1 --branch "$WOLFCOSE_REF" \
+          https://github.com/wolfSSL/wolfCOSE.git wolfCOSE
         cd wolfssl
         ./autogen.sh
         ./configure --enable-ecc --enable-ed25519 --enable-ed448 \
