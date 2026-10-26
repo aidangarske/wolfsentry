@@ -240,6 +240,8 @@ jobs:
             target: linux-lwip-test-no-ipv6
           - name: Linux lwIP C89 m32
             target: linux-lwip-c89-m32-test
+          - name: Cortex-M33 footprint
+            target: footprint-test
 
     steps:
     - uses: actions/checkout@v4

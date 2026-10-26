@@ -543,6 +543,31 @@ no-addr-bitmask-matching-test:
 	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-addr-bitmask-matching-builds" clean
 	@echo "passed: NO_ADDR_BITMASK_MATCHING test."
 
+$(BUILD_TOP)/tests/footprint: $(SRC_TOP)/tests/footprint.c $(BUILD_TOP)/$(LIB_NAME) $(OPTIONS_FILE) $(WOLFCOSE_LINK_DEPS)
+	$(Q)[ -d $(dir $@) ] || mkdir -p $(dir $@)
+	$(Q)$(CC) $(CFLAGS) $(FOOTPRINT_APP_CFLAGS) $(LDFLAGS) -specs=nosys.specs -Wl,--unresolved-symbols=ignore-all -o $@ $< $(BUILD_TOP)/$(LIB_NAME) $(TEST_LIBS)
+
+FOOTPRINT_BUILD_ARGS = HOST=arm-none-eabi RUNTIME=FreeRTOS-lwIP FREERTOS_TOP=$(FREERTOS_TOP_FOR_TEST) LWIP_TOP=$(LWIP_TOP_FOR_TEST) OPTIM=-Os FUNCTION_SECTIONS=1 NO_STDIO_STREAMS=1 SINGLETHREADED=1
+FOOTPRINT_ARCH_CFLAGS = -mthumb -mcpu=cortex-m33 -specs=nano.specs
+FOOTPRINT_LEAN_CFLAGS = -DWOLFSENTRY_NO_ERROR_STRINGS -DWOLFSENTRY_NO_PROTOCOL_NAMES
+FOOTPRINT_ENGINE_MAX ?= 14400
+FOOTPRINT_JSON_MAX ?= 74100
+FOOTPRINT_JSON_NO_DOUBLE_MAX ?= 53400
+
+# $(1) profile, $(2) byte budget, $(3) application flags, $(4) make arguments, $(5) extra CFLAGS
+define FOOTPRINT_PROFILE_TEST
+	@+$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-footprint-$(1)" $(FOOTPRINT_BUILD_ARGS) $(4) EXTRA_CFLAGS='$(FOOTPRINT_ARCH_CFLAGS) $(5)' FOOTPRINT_APP_CFLAGS='$(3)' '$(BUILD_PARENT)/wolfsentry-footprint-$(1)/tests/footprint'
+	@FOOTPRINT_SZ=$$(arm-none-eabi-size -A '$(BUILD_PARENT)/wolfsentry-footprint-$(1)/tests/footprint' | awk '/^\.(text|rodata|data) / {s += $$2} END {print s}'); echo "$(1) footprint: $$FOOTPRINT_SZ bytes (budget $(2))"; rm -rf '$(BUILD_PARENT)/wolfsentry-footprint-$(1)'; [[ "$$FOOTPRINT_SZ" -gt 0 && "$$FOOTPRINT_SZ" -le $(2) ]]
+
+endef
+
+.PHONY: footprint-test
+footprint-test:
+	$(call FOOTPRINT_PROFILE_TEST,engine-lean,$(FOOTPRINT_ENGINE_MAX),,NO_JSON=1 NO_IPV6=1 NO_ADDR_BITMASK_MATCHING=1,$(FOOTPRINT_LEAN_CFLAGS))
+	$(call FOOTPRINT_PROFILE_TEST,json,$(FOOTPRINT_JSON_MAX),-DFOOTPRINT_JSON,,)
+	$(call FOOTPRINT_PROFILE_TEST,json-no-double,$(FOOTPRINT_JSON_NO_DOUBLE_MAX),-DFOOTPRINT_JSON,NO_DOUBLE=1,)
+	@echo "passed: Cortex-M33 footprint test."
+
 .PHONY: lto-test
 lto-test:
 	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-lto-test-builds" LTO=1 clean
