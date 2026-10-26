@@ -319,6 +319,15 @@ endif
 ifdef NO_CONFIG_ERROR_MESSAGES
     CFLAGS += -DWOLFSENTRY_CONFIG_NO_ERROR_MESSAGES
 endif
+ifdef NO_CONFIG_TEXT_KEYS
+    ifndef WOLFCOSE
+        $(error NO_CONFIG_TEXT_KEYS requires WOLFCOSE=1)
+    endif
+    ifndef NO_JSON
+        $(error NO_CONFIG_TEXT_KEYS requires NO_JSON=1)
+    endif
+    CFLAGS += -DWOLFSENTRY_CONFIG_NO_TEXT_KEYS
+endif
 
 ifdef NO_DOUBLE
     CFLAGS += -DWOLFSENTRY_NO_DOUBLE

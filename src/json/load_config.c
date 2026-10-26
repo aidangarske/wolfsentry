@@ -86,9 +86,19 @@ enum config_input_format {
     #error WOLFSENTRY_CONFIG_NO_TEXT_ADDRESSES requires WOLFSENTRY_NO_JSON.
 #endif
 
+#if defined(WOLFSENTRY_CONFIG_NO_TEXT_KEYS) && \
+    !defined(WOLFSENTRY_WOLFCOSE)
+    #error WOLFSENTRY_CONFIG_NO_TEXT_KEYS requires WOLFSENTRY_WOLFCOSE.
+#endif
+#if defined(WOLFSENTRY_CONFIG_NO_TEXT_KEYS) && \
+    !defined(WOLFSENTRY_NO_JSON)
+    #error WOLFSENTRY_CONFIG_NO_TEXT_KEYS requires WOLFSENTRY_NO_JSON.
+#endif
+
 #ifdef WOLFSENTRY_WOLFCOSE
     #define CONFIG_VALUE_BYTE_STRING ((JSON_TYPE)(JSON_OBJECT_END + 1))
     #define CONFIG_VALUE_NUMBER ((JSON_TYPE)(JSON_OBJECT_END + 2))
+    #define CONFIG_KEY_ID ((JSON_TYPE)(JSON_OBJECT_END + 3))
     #define CONFIG_TYPE_IS_NUMBER(type) \
         (((type) == JSON_NUMBER) || ((type) == CONFIG_VALUE_NUMBER))
 #else
@@ -136,6 +146,9 @@ struct wolfsentry_json_process_state {
     int cur_depth;
     char cur_keyname[WOLFSENTRY_MAX_LABEL_BYTES];
     size_t cur_keyname_len;
+#ifdef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+    int cur_key_id;
+#endif
     int cur_keydepth;
 #ifndef WOLFSENTRY_NO_JSON
     JSON_INPUT_POS key_pos;
@@ -225,8 +238,88 @@ struct wolfsentry_json_process_state {
     } o_u_c;
 };
 
-#define JPS_KEY_IS(jps, name) (((jps)->cur_keyname_len == sizeof(name) - 1U) && \
-    (memcmp((jps)->cur_keyname, (name), sizeof(name) - 1U) == 0))
+#ifndef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+#define CONFIG_KEY_NAME_LABEL "label"
+#define CONFIG_KEY_NAME_FAMILY "family"
+#define CONFIG_KEY_NAME_PROTOCOL "protocol"
+#define CONFIG_KEY_NAME_REMOTE "remote"
+#define CONFIG_KEY_NAME_LOCAL "local"
+#define CONFIG_KEY_NAME_ADDRESS "address"
+#define CONFIG_KEY_NAME_PREFIX_BITS "prefix-bits"
+#define CONFIG_KEY_NAME_PORT "port"
+#define CONFIG_KEY_NAME_INTERFACE "interface"
+#define CONFIG_KEY_NAME_BITMASK "bitmask"
+#define CONFIG_KEY_NAME_PARENT_EVENT "parent-event"
+#define CONFIG_KEY_NAME_PRIORITY "priority"
+#define CONFIG_KEY_NAME_CONFIG "config"
+#define CONFIG_KEY_NAME_MATCH_ACTIONS "match-actions"
+#define CONFIG_KEY_NAME_POST_ACTIONS "post-actions"
+#define CONFIG_KEY_NAME_INSERT_ACTIONS "insert-actions"
+#define CONFIG_KEY_NAME_UPDATE_ACTIONS "update-actions"
+#define CONFIG_KEY_NAME_DELETE_ACTIONS "delete-actions"
+#define CONFIG_KEY_NAME_DECISION_ACTIONS "decision-actions"
+#define CONFIG_KEY_NAME_AUX_PARENT_EVENT "aux-parent-event"
+#define CONFIG_KEY_NAME_WOLFSENTRY_CONFIG_VERSION "wolfsentry-config-version"
+#define CONFIG_KEY_NAME_EVENTS "events"
+#define CONFIG_KEY_NAME_ROUTES "routes"
+#define CONFIG_KEY_NAME_DEFAULT_POLICIES "default-policies"
+#define CONFIG_KEY_NAME_DEFAULT_POLICY "default-policy"
+#define CONFIG_KEY_NAME_DEFAULT_EVENT "default-event"
+#define CONFIG_KEY_NAME_CONFIG_UPDATE "config-update"
+#define CONFIG_KEY_NAME_USER_VALUES "user-values"
+#define CONFIG_KEY_NAME_ACTIONS_UPDATE "actions-update"
+#define CONFIG_KEY_NAME_MAX_CONNECTION_COUNT "max-connection-count"
+#define CONFIG_KEY_NAME_PENALTY_BOX_DURATION "penalty-box-duration"
+#define CONFIG_KEY_NAME_ROUTE_IDLE_TIME_FOR_PURGE "route-idle-time-for-purge"
+#define CONFIG_KEY_NAME_DEROG_THRESH_FOR_PENALTY_BOXING "derog-thresh-for-penalty-boxing"
+#define CONFIG_KEY_NAME_DEROG_THRESH_IGNORE_COMMENDABLE "derog-thresh-ignore-commendable"
+#define CONFIG_KEY_NAME_COMMENDABLE_CLEARS_DEROGATORY "commendable-clears-derogatory"
+#define CONFIG_KEY_NAME_MAX_PURGEABLE_ROUTES "max-purgeable-routes"
+#define CONFIG_KEY_NAME_MAX_PURGEABLE_IDLE_TIME "max-purgeable-idle-time"
+#define CONFIG_KEY_NAME_ROUTE_FLAGS_TO_ADD_ON_INSERT "route-flags-to-add-on-insert"
+#define CONFIG_KEY_NAME_ROUTE_FLAGS_TO_CLEAR_ON_INSERT "route-flags-to-clear-on-insert"
+#define CONFIG_KEY_NAME_ACTION_RES_FILTER_BITS_SET "action-res-filter-bits-set"
+#define CONFIG_KEY_NAME_ACTION_RES_FILTER_BITS_UNSET "action-res-filter-bits-unset"
+#define CONFIG_KEY_NAME_ACTION_RES_BITS_TO_ADD "action-res-bits-to-add"
+#define CONFIG_KEY_NAME_ACTION_RES_BITS_TO_CLEAR "action-res-bits-to-clear"
+#define CONFIG_KEY_NAME_UINT "uint"
+#define CONFIG_KEY_NAME_SINT "sint"
+#define CONFIG_KEY_NAME_FLOAT "float"
+#define CONFIG_KEY_NAME_STRING "string"
+#define CONFIG_KEY_NAME_BASE64 "base64"
+#define CONFIG_KEY_NAME_JSON "json"
+#define CONFIG_KEY_NAME_EVENTS_INSERT "events-insert"
+#define CONFIG_KEY_NAME_STATIC_ROUTES_INSERT "static-routes-insert"
+#define CONFIG_KEY_NAME_ACTIONS "actions"
+#define CONFIG_KEY_NAME_INSERT_EVENT "insert-event"
+#define CONFIG_KEY_NAME_MATCH_EVENT "match-event"
+#define CONFIG_KEY_NAME_UPDATE_EVENT "update-event"
+#define CONFIG_KEY_NAME_DELETE_EVENT "delete-event"
+#define CONFIG_KEY_NAME_DECISION_EVENT "decision-event"
+#endif
+
+#ifdef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+#define CONFIG_ROUTE_FLAG_KEYS ((wolfsentry_route_flags_t)( \
+    WOLFSENTRY_ROUTE_FLAG_SA_FAMILY_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_SA_REMOTE_ADDR_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_SA_REMOTE_PORT_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_SA_LOCAL_ADDR_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_SA_LOCAL_PORT_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_REMOTE_INTERFACE_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_LOCAL_INTERFACE_WILDCARD | \
+    WOLFSENTRY_ROUTE_FLAG_TCPLIKE_PORT_NUMBERS | \
+    WOLFSENTRY_ROUTE_FLAG_DIRECTION_IN | \
+    WOLFSENTRY_ROUTE_FLAG_DIRECTION_OUT | \
+    WOLFSENTRY_ROUTE_FLAG_PENALTYBOXED | \
+    WOLFSENTRY_ROUTE_FLAG_GREENLISTED | \
+    WOLFSENTRY_ROUTE_FLAG_DONT_COUNT_HITS | \
+    WOLFSENTRY_ROUTE_FLAG_DONT_COUNT_CURRENT_CONNECTIONS | \
+    WOLFSENTRY_ROUTE_FLAG_PORT_RESET))
+#define JPS_KEY_IS(jps, key) ((jps)->cur_key_id == (int)WOLFSENTRY_CONFIG_KEY_ ## key)
+#else
+#define JPS_KEY_IS(jps, key) (((jps)->cur_keyname_len == sizeof(CONFIG_KEY_NAME_ ## key) - 1U) && \
+    (memcmp((jps)->cur_keyname, CONFIG_KEY_NAME_ ## key, sizeof(CONFIG_KEY_NAME_ ## key) - 1U) == 0))
+#endif
 
 #ifdef WOLFSENTRY_WOLFCOSE
 static const struct config_number *get_config_number(
@@ -784,8 +877,8 @@ static wolfsentry_errcode_t convert_default_policy(JSON_TYPE type, const unsigne
 
 static wolfsentry_errcode_t handle_eventconfig_clause(struct wolfsentry_json_process_state *jps, JSON_TYPE type, const unsigned char *data, size_t data_size, struct wolfsentry_eventconfig *eventconfig) {
     if (jps->cur_depth == 5) {
-        if ((JPS_KEY_IS(jps, "route-flags-to-add-on-insert")) ||
-            (JPS_KEY_IS(jps, "route-flags-to-clear-on-insert")))
+        if ((JPS_KEY_IS(jps, ROUTE_FLAGS_TO_ADD_ON_INSERT)) ||
+            (JPS_KEY_IS(jps, ROUTE_FLAGS_TO_CLEAR_ON_INSERT)))
         {
             wolfsentry_route_flags_t flag;
             wolfsentry_errcode_t ret;
@@ -798,16 +891,16 @@ static wolfsentry_errcode_t handle_eventconfig_clause(struct wolfsentry_json_pro
 
             ret = wolfsentry_route_flag_assoc_by_name((const char *)data, (int)data_size, &flag);
             WOLFSENTRY_RERETURN_IF_ERROR(ret);
-            if (JPS_KEY_IS(jps, "route-flags-to-add-on-insert"))
+            if (JPS_KEY_IS(jps, ROUTE_FLAGS_TO_ADD_ON_INSERT))
                 eventconfig->route_flags_to_add_on_insert |= flag;
             else
                 eventconfig->route_flags_to_clear_on_insert |= flag;
             WOLFSENTRY_RETURN_OK;
 
-        } else if ((JPS_KEY_IS(jps, "action-res-filter-bits-set")) ||
-                   (JPS_KEY_IS(jps, "action-res-filter-bits-unset")) ||
-                   (JPS_KEY_IS(jps, "action-res-bits-to-add")) ||
-                   (JPS_KEY_IS(jps, "action-res-bits-to-clear")))
+        } else if ((JPS_KEY_IS(jps, ACTION_RES_FILTER_BITS_SET)) ||
+                   (JPS_KEY_IS(jps, ACTION_RES_FILTER_BITS_UNSET)) ||
+                   (JPS_KEY_IS(jps, ACTION_RES_BITS_TO_ADD)) ||
+                   (JPS_KEY_IS(jps, ACTION_RES_BITS_TO_CLEAR)))
         {
             wolfsentry_action_res_t flag;
             wolfsentry_errcode_t ret;
@@ -821,11 +914,11 @@ static wolfsentry_errcode_t handle_eventconfig_clause(struct wolfsentry_json_pro
             ret = wolfsentry_action_res_assoc_by_name((const char *)data, (int)data_size, &flag);
             WOLFSENTRY_RERETURN_IF_ERROR(ret);
 
-            if (JPS_KEY_IS(jps, "action-res-filter-bits-set"))
+            if (JPS_KEY_IS(jps, ACTION_RES_FILTER_BITS_SET))
                 eventconfig->action_res_filter_bits_set |= flag;
-            else if (JPS_KEY_IS(jps, "action-res-filter-bits-unset"))
+            else if (JPS_KEY_IS(jps, ACTION_RES_FILTER_BITS_UNSET))
                 eventconfig->action_res_filter_bits_unset |= flag;
-            else if (JPS_KEY_IS(jps, "action-res-bits-to-add"))
+            else if (JPS_KEY_IS(jps, ACTION_RES_BITS_TO_ADD))
                 eventconfig->action_res_bits_to_add |= flag;
             else
                 eventconfig->action_res_bits_to_clear |= flag;
@@ -854,20 +947,20 @@ static wolfsentry_errcode_t handle_eventconfig_clause(struct wolfsentry_json_pro
         }
         WOLFSENTRY_RETURN_OK;
     }
-    if (JPS_KEY_IS(jps, "max-connection-count"))
+    if (JPS_KEY_IS(jps, MAX_CONNECTION_COUNT))
         WOLFSENTRY_ERROR_RERETURN(convert_uint32(type, data, data_size, &eventconfig->max_connection_count));
-    if (JPS_KEY_IS(jps, "penalty-box-duration"))
+    if (JPS_KEY_IS(jps, PENALTY_BOX_DURATION))
         WOLFSENTRY_ERROR_RERETURN(convert_wolfsentry_duration(jps->wolfsentry, type, data, data_size, &eventconfig->penaltybox_duration));
-    if (JPS_KEY_IS(jps, "route-idle-time-for-purge"))
+    if (JPS_KEY_IS(jps, ROUTE_IDLE_TIME_FOR_PURGE))
         WOLFSENTRY_ERROR_RERETURN(convert_wolfsentry_duration(jps->wolfsentry, type, data, data_size, &eventconfig->route_idle_time_for_purge));
-    if (JPS_KEY_IS(jps, "derog-thresh-for-penalty-boxing"))
+    if (JPS_KEY_IS(jps, DEROG_THRESH_FOR_PENALTY_BOXING))
         WOLFSENTRY_ERROR_RERETURN(convert_uint32(type, data, data_size, &eventconfig->derogatory_threshold_for_penaltybox));
-    if (JPS_KEY_IS(jps, "derog-thresh-ignore-commendable"))
+    if (JPS_KEY_IS(jps, DEROG_THRESH_IGNORE_COMMENDABLE))
         WOLFSENTRY_ERROR_RERETURN(convert_eventconfig_flag(type, &eventconfig->flags, WOLFSENTRY_EVENTCONFIG_FLAG_DEROGATORY_THRESHOLD_IGNORE_COMMENDABLE));
-    if (JPS_KEY_IS(jps, "commendable-clears-derogatory"))
+    if (JPS_KEY_IS(jps, COMMENDABLE_CLEARS_DEROGATORY))
         WOLFSENTRY_ERROR_RERETURN(convert_eventconfig_flag(type, &eventconfig->flags, WOLFSENTRY_EVENTCONFIG_FLAG_COMMENDABLE_CLEARS_DEROGATORY));
 
-    if (JPS_KEY_IS(jps, "max-purgeable-routes")) {
+    if (JPS_KEY_IS(jps, MAX_PURGEABLE_ROUTES)) {
         struct wolfsentry_route_table *route_table;
         wolfsentry_hitcount_t max_purgeable_routes;
         wolfsentry_errcode_t ret;
@@ -885,7 +978,7 @@ static wolfsentry_errcode_t handle_eventconfig_clause(struct wolfsentry_json_pro
         WOLFSENTRY_RETURN_OK;
     }
 
-    if (JPS_KEY_IS(jps, "max-purgeable-idle-time")) {
+    if (JPS_KEY_IS(jps, MAX_PURGEABLE_IDLE_TIME)) {
         struct wolfsentry_route_table *route_table;
         wolfsentry_time_t max_purgeable_idle_time;
         wolfsentry_errcode_t ret;
@@ -923,9 +1016,9 @@ static wolfsentry_errcode_t handle_defaultpolicy_clause(struct wolfsentry_json_p
         }
         WOLFSENTRY_RETURN_OK;
     }
-    if (JPS_KEY_IS(jps, "default-policy"))
+    if (JPS_KEY_IS(jps, DEFAULT_POLICY))
         WOLFSENTRY_ERROR_RERETURN(convert_default_policy(type, data, data_size, &jps->default_policy));
-    if (JPS_KEY_IS(jps, "default-event")) {
+    if (JPS_KEY_IS(jps, DEFAULT_EVENT)) {
         struct wolfsentry_route_table *routes;
         wolfsentry_errcode_t ret;
         if (type != JSON_STRING)
@@ -1255,7 +1348,7 @@ static wolfsentry_errcode_t convert_sockaddr_port_name(struct wolfsentry_json_pr
 #endif /* !WOLFSENTRY_NO_GETPROTOBY */
 
 static wolfsentry_errcode_t handle_route_endpoint_clause(struct wolfsentry_json_process_state *jps, JSON_TYPE type, const unsigned char *data, size_t data_size, struct wolfsentry_sockaddr *sa) {
-    if (JPS_KEY_IS(jps, "port")) {
+    if (JPS_KEY_IS(jps, PORT)) {
         if (sa->sa_family == WOLFSENTRY_AF_UNSPEC)
             WOLFSENTRY_ERROR_RETURN(CONFIG_OUT_OF_SEQUENCE);
         WOLFSENTRY_CLEAR_BITS(jps->o_u_c.route.flags,
@@ -1270,7 +1363,7 @@ static wolfsentry_errcode_t handle_route_endpoint_clause(struct wolfsentry_json_
 #endif
         else
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-    } else if (JPS_KEY_IS(jps, "address")) {
+    } else if (JPS_KEY_IS(jps, ADDRESS)) {
         if (sa->sa_family == WOLFSENTRY_AF_UNSPEC)
             WOLFSENTRY_ERROR_RETURN(CONFIG_OUT_OF_SEQUENCE);
         WOLFSENTRY_CLEAR_BITS(jps->o_u_c.route.flags,
@@ -1280,7 +1373,7 @@ static wolfsentry_errcode_t handle_route_endpoint_clause(struct wolfsentry_json_
         WOLFSENTRY_ERROR_RERETURN(convert_sockaddr_address(jps, type, data, data_size, sa, sa->addr));
     }
 #ifdef WOLFSENTRY_ADDR_BITMASK_MATCHING
-    else if (JPS_KEY_IS(jps, "bitmask")) {
+    else if (JPS_KEY_IS(jps, BITMASK)) {
         wolfsentry_addr_bits_t addr_size;
         wolfsentry_errcode_t ret;
 
@@ -1320,7 +1413,7 @@ static wolfsentry_errcode_t handle_route_endpoint_clause(struct wolfsentry_json_
         WOLFSENTRY_ERROR_RERETURN(ret);
     }
 #endif
-    else if (JPS_KEY_IS(jps, "prefix-bits")) {
+    else if (JPS_KEY_IS(jps, PREFIX_BITS)) {
         if (sa->sa_family == WOLFSENTRY_AF_UNSPEC)
             WOLFSENTRY_ERROR_RETURN(CONFIG_OUT_OF_SEQUENCE);
 #ifdef WOLFSENTRY_ADDR_BITMASK_MATCHING
@@ -1335,7 +1428,7 @@ static wolfsentry_errcode_t handle_route_endpoint_clause(struct wolfsentry_json_
 #endif
         WOLFSENTRY_ERROR_RERETURN(convert_uint16(type, data, data_size, &sa->addr_len));
     }
-    else if (JPS_KEY_IS(jps, "interface")) {
+    else if (JPS_KEY_IS(jps, INTERFACE)) {
         WOLFSENTRY_CLEAR_BITS(jps->o_u_c.route.flags,
                               sa == (struct wolfsentry_sockaddr *)&jps->o_u_c.route.remote ?
                               WOLFSENTRY_ROUTE_FLAG_REMOTE_INTERFACE_WILDCARD :
@@ -1472,10 +1565,10 @@ static wolfsentry_errcode_t handle_route_clause(struct wolfsentry_json_process_s
 #ifndef WOLFSENTRY_CONFIG_NO_ROUTE_ENDPOINTS
     if (jps->cur_depth == 4) {
         if (type == JSON_OBJECT_BEG) {
-            if (JPS_KEY_IS(jps, "remote")) {
+            if (JPS_KEY_IS(jps, REMOTE)) {
                 jps->section_under_construction = S_U_C_REMOTE_ENDPOINT;
                 WOLFSENTRY_RETURN_OK;
-            } else if (JPS_KEY_IS(jps, "local")) {
+            } else if (JPS_KEY_IS(jps, LOCAL)) {
                 jps->section_under_construction = S_U_C_LOCAL_ENDPOINT;
                 WOLFSENTRY_RETURN_OK;
             } else
@@ -1496,7 +1589,7 @@ static wolfsentry_errcode_t handle_route_clause(struct wolfsentry_json_process_s
     if (jps->cur_depth != 3)
         WOLFSENTRY_ERROR_RETURN(CONFIG_UNEXPECTED);
 
-    if (JPS_KEY_IS(jps, "parent-event")) {
+    if (JPS_KEY_IS(jps, PARENT_EVENT)) {
         if (type != JSON_STRING)
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
         if (data_size > sizeof jps->o_u_c.route.event_label)
@@ -1506,12 +1599,20 @@ static wolfsentry_errcode_t handle_route_clause(struct wolfsentry_json_process_s
         WOLFSENTRY_CLEAR_BITS(jps->o_u_c.route.flags, WOLFSENTRY_ROUTE_FLAG_PARENT_EVENT_WILDCARD);
         WOLFSENTRY_RETURN_OK;
     }
-    else if (JPS_KEY_IS(jps, "family"))
+    else if (JPS_KEY_IS(jps, FAMILY))
         WOLFSENTRY_ERROR_RERETURN(handle_route_family_clause(jps, type, data, data_size));
-    else if (JPS_KEY_IS(jps, "protocol"))
+    else if (JPS_KEY_IS(jps, PROTOCOL))
         WOLFSENTRY_ERROR_RERETURN(handle_route_protocol_clause(jps, type, data, data_size));
     else {
         wolfsentry_route_flags_t flag;
+#ifdef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+        if (jps->cur_key_id < (int)WOLFSENTRY_CONFIG_KEY_ROUTE_FLAG_BASE)
+            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_KEY);
+        flag = (wolfsentry_route_flags_t)1U << (unsigned)(jps->cur_key_id - (int)WOLFSENTRY_CONFIG_KEY_ROUTE_FLAG_BASE);
+        if (! (flag & CONFIG_ROUTE_FLAG_KEYS))
+            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_KEY);
+        WOLFSENTRY_ERROR_RERETURN(handle_route_boolean_clause(type, &jps->o_u_c.route.flags, flag));
+#else
         ret = wolfsentry_route_flag_assoc_by_name(jps->cur_keyname, WOLFSENTRY_LENGTH_NULL_TERMINATED, &flag);
         if (ret >= 0)
             WOLFSENTRY_ERROR_RERETURN(handle_route_boolean_clause(type, &jps->o_u_c.route.flags, flag));
@@ -1521,6 +1622,7 @@ static wolfsentry_errcode_t handle_route_clause(struct wolfsentry_json_process_s
             else
                 WOLFSENTRY_ERROR_RERETURN(ret);
         }
+#endif
     }
 }
 
@@ -1545,7 +1647,7 @@ static wolfsentry_errcode_t handle_event_clause(struct wolfsentry_json_process_s
             WOLFSENTRY_ERROR_RETURN(CONFIG_UNEXPECTED);
     }
 
-    if ((jps->cur_depth == 3) && (type == JSON_STRING) && (JPS_KEY_IS(jps, "label"))) {
+    if ((jps->cur_depth == 3) && (type == JSON_STRING) && (JPS_KEY_IS(jps, LABEL))) {
         if (data_size >= sizeof jps->o_u_c.event.label)
             WOLFSENTRY_ERROR_RETURN(STRING_ARG_TOO_LONG);
         memcpy(jps->o_u_c.event.label, data, data_size);
@@ -1554,7 +1656,7 @@ static wolfsentry_errcode_t handle_event_clause(struct wolfsentry_json_process_s
     }
 
     if ((jps->cur_depth == 3) && CONFIG_TYPE_IS_NUMBER(type)) {
-        if (JPS_KEY_IS(jps, "priority")) {
+        if (JPS_KEY_IS(jps, PRIORITY)) {
             if (jps->o_u_c.event.inserted)
                 WOLFSENTRY_ERROR_RETURN(CONFIG_OUT_OF_SEQUENCE);
             WOLFSENTRY_ERROR_RERETURN(convert_uint16(type, data, data_size, &jps->o_u_c.event.priority));
@@ -1563,7 +1665,7 @@ static wolfsentry_errcode_t handle_event_clause(struct wolfsentry_json_process_s
     }
 
 #ifndef WOLFSENTRY_CONFIG_NO_EVENTCONFIG
-    if ((jps->cur_depth == 4) && (type == JSON_OBJECT_BEG) && (JPS_KEY_IS(jps, "config")) && (jps->section_under_construction == S_U_C_NONE)) {
+    if ((jps->cur_depth == 4) && (type == JSON_OBJECT_BEG) && (JPS_KEY_IS(jps, CONFIG)) && (jps->section_under_construction == S_U_C_NONE)) {
         if (jps->o_u_c.event.inserted)
             WOLFSENTRY_ERROR_RETURN(CONFIG_OUT_OF_SEQUENCE);
         jps->section_under_construction = S_U_C_EVENTCONFIG;
@@ -1612,7 +1714,7 @@ static wolfsentry_errcode_t handle_event_clause(struct wolfsentry_json_process_s
         WOLFSENTRY_ERROR_RERETURN(reset_o_u_c(jps));
 
     if ((jps->cur_depth == 3) && (type == JSON_STRING)) {
-        if (JPS_KEY_IS(jps, "aux-parent-event")) {
+        if (JPS_KEY_IS(jps, AUX_PARENT_EVENT)) {
             if (WOLFSENTRY_CHECK_BITS(jps->load_flags, WOLFSENTRY_CONFIG_LOAD_FLAG_NO_ROUTES_OR_EVENTS))
                 WOLFSENTRY_RETURN_OK;
             WOLFSENTRY_ERROR_RERETURN(wolfsentry_event_set_aux_event(
@@ -1631,15 +1733,15 @@ static wolfsentry_errcode_t handle_event_clause(struct wolfsentry_json_process_s
             /* In early versions (pre-1.4.0), there was only one action list in
              * each event, and "subevents" held the lists for each action type.
              */
-            if (JPS_KEY_IS(jps, "insert-event"))
+            if (JPS_KEY_IS(jps, INSERT_EVENT))
                 subevent_type = WOLFSENTRY_ACTION_TYPE_INSERT;
-            else if (JPS_KEY_IS(jps, "match-event"))
+            else if (JPS_KEY_IS(jps, MATCH_EVENT))
                 subevent_type = WOLFSENTRY_ACTION_TYPE_MATCH;
-            else if (JPS_KEY_IS(jps, "update-event"))
+            else if (JPS_KEY_IS(jps, UPDATE_EVENT))
                 subevent_type = WOLFSENTRY_ACTION_TYPE_UPDATE;
-            else if (JPS_KEY_IS(jps, "delete-event"))
+            else if (JPS_KEY_IS(jps, DELETE_EVENT))
                 subevent_type = WOLFSENTRY_ACTION_TYPE_DELETE;
-            else if (JPS_KEY_IS(jps, "decision-event"))
+            else if (JPS_KEY_IS(jps, DECISION_EVENT))
                 subevent_type = WOLFSENTRY_ACTION_TYPE_DECISION;
 
             if (subevent_type != WOLFSENTRY_ACTION_TYPE_NONE) {
@@ -1689,23 +1791,23 @@ static wolfsentry_errcode_t handle_event_clause(struct wolfsentry_json_process_s
     }
 
     if ((jps->cur_depth == 4) && (type == JSON_ARRAY_BEG) && (jps->section_under_construction == S_U_C_NONE)) {
-        if (JPS_KEY_IS(jps, "post-actions"))
+        if (JPS_KEY_IS(jps, POST_ACTIONS))
         {
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_POST;
         }
 #ifndef WOLFSENTRY_CONFIG_NO_LEGACY_EVENT_SYNTAX
-        else if (JPS_KEY_IS(jps, "actions"))
+        else if (JPS_KEY_IS(jps, ACTIONS))
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_POST;
 #endif
-        else if (JPS_KEY_IS(jps, "insert-actions"))
+        else if (JPS_KEY_IS(jps, INSERT_ACTIONS))
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_INSERT;
-        else if (JPS_KEY_IS(jps, "match-actions"))
+        else if (JPS_KEY_IS(jps, MATCH_ACTIONS))
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_MATCH;
-        else if (JPS_KEY_IS(jps, "update-actions"))
+        else if (JPS_KEY_IS(jps, UPDATE_ACTIONS))
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_UPDATE;
-        else if (JPS_KEY_IS(jps, "delete-actions"))
+        else if (JPS_KEY_IS(jps, DELETE_ACTIONS))
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_DELETE;
-        else if (JPS_KEY_IS(jps, "decision-actions"))
+        else if (JPS_KEY_IS(jps, DECISION_ACTIONS))
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_DECISION;
         else
             jps->o_u_c.event.cur_action_list_under_construction = WOLFSENTRY_ACTION_TYPE_NONE;
@@ -1883,7 +1985,7 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
     }
 
 #ifdef WOLFSENTRY_CONFIG_HAVE_JSON_DOM
-    if ((jps->object_under_construction == O_U_C_USER_VALUE) && (jps->section_under_construction != S_U_C_USER_VALUE_JSON) && (JPS_KEY_IS(jps, "json"))) {
+    if ((jps->object_under_construction == O_U_C_USER_VALUE) && (jps->section_under_construction != S_U_C_USER_VALUE_JSON) && (JPS_KEY_IS(jps, JSON))) {
 #ifdef WOLFSENTRY_JSON_VALUE_MAX_BYTES
         if (jps->input_format == CONFIG_INPUT_JSON)
             jps->json_value_start_pos = jps->parser.pos;
@@ -1971,15 +2073,15 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
                (json_type == JSON_STRING)))
             WOLFSENTRY_ERROR_RETURN(CONFIG_UNEXPECTED);
 
-        if (JPS_KEY_IS(jps, "uint"))
+        if (JPS_KEY_IS(jps, UINT))
             ws_type = WOLFSENTRY_KV_UINT;
-        else if (JPS_KEY_IS(jps, "sint"))
+        else if (JPS_KEY_IS(jps, SINT))
             ws_type = WOLFSENTRY_KV_SINT;
-        else if (JPS_KEY_IS(jps, "float"))
+        else if (JPS_KEY_IS(jps, FLOAT))
             ws_type = WOLFSENTRY_KV_FLOAT;
-        else if (JPS_KEY_IS(jps, "string"))
+        else if (JPS_KEY_IS(jps, STRING))
             ws_type = WOLFSENTRY_KV_STRING;
-        else if (JPS_KEY_IS(jps, "base64"))
+        else if (JPS_KEY_IS(jps, BASE64))
             ws_type = WOLFSENTRY_KV_BYTES;
         else
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
@@ -2087,6 +2189,23 @@ static wolfsentry_errcode_t json_process(
         printf("depth=%d t=%d\n", jps->cur_depth, type);
 #endif
 
+#ifdef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+    if (type == CONFIG_KEY_ID) {
+        /* user-value names are application data and stay text */
+        if ((data_size == (size_t)WOLFSENTRY_CONFIG_KEY_NONE) ||
+            (data_size >= (size_t)WOLFSENTRY_CONFIG_KEY_ROUTE_FLAG_BASE + 32U) ||
+            ((jps->table_under_construction == T_U_C_USER_VALUES) && (jps->cur_depth == 2)))
+        {
+            WOLFSENTRY_ERROR_OUT(CONFIG_INVALID_KEY);
+        }
+        jps->cur_key_id = (int)data_size;
+        jps->cur_keyname[0] = 0;
+        jps->cur_keyname_len = 0;
+        jps->cur_keydepth = jps->cur_depth;
+        WOLFSENTRY_RETURN_OK;
+    }
+#endif
+
     if (type == JSON_KEY) {
 
 #ifdef WOLFSENTRY_CONFIG_HAVE_JSON_DOM
@@ -2094,6 +2213,10 @@ static wolfsentry_errcode_t json_process(
             ret = handle_user_value_clause(jps, type, data, data_size);
             goto out;
         }
+#endif
+#ifdef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+        /* text keys match no schema key, so only user-value names are accepted */
+        jps->cur_key_id = (int)WOLFSENTRY_CONFIG_KEY_NONE;
 #endif
 
 #ifndef WOLFSENTRY_NO_JSON
@@ -2136,7 +2259,7 @@ static wolfsentry_errcode_t json_process(
             case JSON_STRING:
                 if (jps->cur_depth != 1)
                     WOLFSENTRY_ERROR_OUT(CONFIG_UNEXPECTED);
-                if (JPS_KEY_IS(jps, "wolfsentry-config-version")) {
+                if (JPS_KEY_IS(jps, WOLFSENTRY_CONFIG_VERSION)) {
                     ret = convert_uint32(type, data, data_size, &jps->config_version);
                     if (ret < 0)
                         goto out;
@@ -2151,17 +2274,17 @@ static wolfsentry_errcode_t json_process(
                 if (jps->cur_depth != 2)
                     WOLFSENTRY_ERROR_OUT(CONFIG_UNEXPECTED);
 #ifndef WOLFSENTRY_CONFIG_NO_EVENTCONFIG
-                if (JPS_KEY_IS(jps, "config-update")) {
+                if (JPS_KEY_IS(jps, CONFIG_UPDATE)) {
                     jps->table_under_construction = T_U_C_TOPCONFIG;
                     WOLFSENTRY_RETURN_OK;
                 }
 #endif
-                if (JPS_KEY_IS(jps, "default-policies")) {
+                if (JPS_KEY_IS(jps, DEFAULT_POLICIES)) {
                     jps->table_under_construction = T_U_C_DEFAULTPOLICIES;
                     WOLFSENTRY_RETURN_OK;
                 }
 #ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
-                if (JPS_KEY_IS(jps, "user-values")) {
+                if (JPS_KEY_IS(jps, USER_VALUES)) {
                     jps->table_under_construction = T_U_C_USER_VALUES;
                     WOLFSENTRY_RETURN_OK;
                 }
@@ -2173,22 +2296,22 @@ static wolfsentry_errcode_t json_process(
                 if (jps->cur_depth != 2)
                     WOLFSENTRY_ERROR_OUT(CONFIG_UNEXPECTED);
 #ifndef WOLFSENTRY_CONFIG_NO_EVENTS
-                if ((JPS_KEY_IS(jps, "events-insert")) ||
-                    (JPS_KEY_IS(jps, "events")))
+                if ((JPS_KEY_IS(jps, EVENTS_INSERT)) ||
+                    (JPS_KEY_IS(jps, EVENTS)))
                 {
                     jps->table_under_construction = T_U_C_EVENTS;
                     WOLFSENTRY_RETURN_OK;
                 }
 #endif
 #ifndef WOLFSENTRY_CONFIG_NO_ROUTES
-                if ((JPS_KEY_IS(jps, "static-routes-insert")) ||
-                    (JPS_KEY_IS(jps, "routes")))
+                if ((JPS_KEY_IS(jps, STATIC_ROUTES_INSERT)) ||
+                    (JPS_KEY_IS(jps, ROUTES)))
                 {
                     jps->table_under_construction = T_U_C_STATIC_ROUTES;
                     WOLFSENTRY_RETURN_OK;
                 }
 #endif
-                if (JPS_KEY_IS(jps, "actions-update")) {
+                if (JPS_KEY_IS(jps, ACTIONS_UPDATE)) {
                     WOLFSENTRY_ERROR_RETURN(CONFIG_MISSING_HANDLER);
                     /*
                     jps->table_under_construction = T_U_C_ACTIONS;
@@ -2830,8 +2953,8 @@ static wolfsentry_errcode_t cbor_emit_number(
                (jps->o_u_c.route.remote.sa_family != WOLFSENTRY_AF_CAN)) ||
               ((jps->section_under_construction == S_U_C_LOCAL_ENDPOINT) &&
                (jps->o_u_c.route.local.sa_family != WOLFSENTRY_AF_CAN))) &&
-             ((JPS_KEY_IS(jps, "address")) ||
-              (JPS_KEY_IS(jps, "bitmask")))))
+             ((JPS_KEY_IS(jps, ADDRESS)) ||
+              (JPS_KEY_IS(jps, BITMASK)))))
         {
             emit_text = 1;
         }
@@ -2839,7 +2962,7 @@ static wolfsentry_errcode_t cbor_emit_number(
 #ifdef WOLFSENTRY_CONFIG_HAVE_JSON_DOM
         if ((jps->section_under_construction == S_U_C_USER_VALUE_JSON) ||
             ((jps->object_under_construction == O_U_C_USER_VALUE) &&
-             (JPS_KEY_IS(jps, "json"))))
+             (JPS_KEY_IS(jps, JSON))))
         {
             emit_text = 1;
         }
@@ -2892,8 +3015,8 @@ static wolfsentry_errcode_t cbor_emit_scalar(
     case WOLFCOSE_CBOR_BSTR:
         if (((jps->section_under_construction != S_U_C_REMOTE_ENDPOINT) &&
              (jps->section_under_construction != S_U_C_LOCAL_ENDPOINT)) ||
-            ((! JPS_KEY_IS(jps, "address")) &&
-             (! JPS_KEY_IS(jps, "bitmask"))))
+            ((! JPS_KEY_IS(jps, ADDRESS)) &&
+             (! JPS_KEY_IS(jps, BITMASK))))
         {
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
         }
@@ -2960,6 +3083,17 @@ static wolfsentry_errcode_t cbor_process(
             if (*decoder_ret < 0)
                 WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
             --stack[depth - 1U].remaining;
+#ifdef WOLFSENTRY_CONFIG_NO_TEXT_KEYS
+            if (item.majorType == WOLFCOSE_CBOR_UINT) {
+                if (item.val >= (uint64_t)WOLFSENTRY_CONFIG_KEY_ROUTE_FLAG_BASE + 32U)
+                    WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_KEY);
+                ret = json_process(CONFIG_KEY_ID, NULL, (size_t)item.val, jps);
+                if (ret < 0)
+                    WOLFSENTRY_ERROR_RERETURN(ret);
+                stack[depth - 1U].expecting_key = 0U;
+                continue;
+            }
+#endif
             if (item.majorType != WOLFCOSE_CBOR_TSTR)
                 WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_KEY);
 #ifdef WOLFSENTRY_CONFIG_HAVE_JSON_DOM

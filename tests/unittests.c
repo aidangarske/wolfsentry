@@ -4310,7 +4310,8 @@ static int test_user_addr_families(void) {
 #endif
 
 #if !defined(WOLFSENTRY_TEST_CBOR_TOTAL_LIMIT) && \
-    !defined(WOLFSENTRY_TEST_CBOR_NESTING_LIMIT)
+    !defined(WOLFSENTRY_TEST_CBOR_NESTING_LIMIT) && \
+    !defined(WOLFSENTRY_CONFIG_NO_TEXT_KEYS)
 static int test_cbor_rejections(WOLFSENTRY_CONTEXT_ARGS_IN)
 {
     static const unsigned char empty_map[] = { 0xa0 };
@@ -4609,7 +4610,148 @@ static int test_cbor_limits(void)
 }
 #endif
 
-#if defined(WOLFSENTRY_NO_DOUBLE) && \
+#if defined(WOLFSENTRY_CONFIG_NO_TEXT_KEYS)
+static int test_cbor(void)
+{
+    static const unsigned char int_key_policy_cbor[] = {
+        0xa5, 0x15, 0x01, 0x18, 0x1b, 0xa2, 0x18, 0x1e, 0x07, 0x18, 0x1f, 0x19,
+        0x02, 0x58, 0x18, 0x18, 0xa1, 0x18, 0x19, 0x66, 0x72, 0x65, 0x6a, 0x65,
+        0x63, 0x74, 0x16, 0x81, 0xa4, 0x01, 0x66, 0x65, 0x76, 0x2d, 0x69, 0x6e,
+        0x74, 0x0c, 0x03, 0x0d, 0xa1, 0x18, 0x1e, 0x04, 0x0e, 0x81, 0x6e, 0x25,
+        0x74, 0x72, 0x61, 0x63, 0x6b, 0x2d, 0x70, 0x65, 0x65, 0x72, 0x2d, 0x76,
+        0x31, 0x17, 0x81, 0xa6, 0x0b, 0x66, 0x65, 0x76, 0x2d, 0x69, 0x6e, 0x74,
+        0x02, 0x02, 0x03, 0x06, 0x18, 0x4a, 0xf5, 0x04, 0xa2, 0x06, 0x44, 0xc0,
+        0x00, 0x02, 0x01, 0x07, 0x18, 0x20, 0x05, 0xa1, 0x08, 0x16
+    };
+    static const unsigned char text_key_cbor[] = {
+        0xa1, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01
+    };
+    static const unsigned char unknown_key_cbor[] = {
+        0xa2, 0x15, 0x01, 0x18, 0x3c, 0x01
+    };
+    static const unsigned char internal_route_flag_cbor[] = {
+        0xa2, 0x15, 0x01, 0x17, 0x81, 0xa2, 0x02, 0x02, 0x18, 0x4e, 0xf5
+    };
+#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+    static const unsigned char int_key_user_values_cbor[] = {
+        0xa2, 0x15, 0x01, 0x18, 0x1c, 0xa2, 0x66, 0x61, 0x6e, 0x73, 0x77, 0x65,
+        0x72, 0x18, 0x2a, 0x65, 0x74, 0x79, 0x70, 0x65, 0x64, 0xa1, 0x18, 0x2d,
+        0x26
+    };
+    static const unsigned char int_user_value_name_cbor[] = {
+        0xa2, 0x15, 0x01, 0x18, 0x1c, 0xa1, 0x01, 0x05
+    };
+    int64_t value = 0;
+#endif
+    struct wolfsentry_context *wolfsentry = NULL;
+    struct wolfsentry_eventconfig initial_config;
+    struct wolfsentry_eventconfig loaded_config;
+    wolfsentry_action_res_t default_policy = WOLFSENTRY_ACTION_RES_NONE;
+    char error[160];
+    wolfsentry_errcode_t ret;
+    WOLFSENTRY_THREAD_HEADER_CHECKED(WOLFSENTRY_THREAD_FLAG_NONE);
+
+    memset(&initial_config, 0, sizeof initial_config);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_init(
+        wolfsentry_build_settings,
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(WOLFSENTRY_TEST_HPI),
+        &initial_config,
+        &wolfsentry));
+
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        int_key_policy_cbor,
+        sizeof int_key_policy_cbor,
+        TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_defaultconfig_get(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        &loaded_config));
+    WOLFSENTRY_EXIT_ON_FALSE(loaded_config.max_connection_count == 7U);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_event_get_config(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "ev-int",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &loaded_config));
+    WOLFSENTRY_EXIT_ON_FALSE(loaded_config.max_connection_count == 4U);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_context_lock_shared(
+        WOLFSENTRY_CONTEXT_ARGS_OUT));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_route_default_policy_get(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        &default_policy));
+    WOLFSENTRY_EXIT_ON_FALSE(wolfsentry->routes->header.n_ents == 1);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_context_unlock(
+        WOLFSENTRY_CONTEXT_ARGS_OUT));
+    WOLFSENTRY_EXIT_ON_FALSE(WOLFSENTRY_MASKIN_BITS(
+        default_policy,
+        WOLFSENTRY_ACTION_RES_REJECT));
+
+    ret = wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        text_key_cbor,
+        sizeof text_key_cbor,
+        WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error);
+    WOLFSENTRY_EXIT_ON_FALSE(WOLFSENTRY_ERROR_CODE_IS(ret, CONFIG_INVALID_KEY));
+    ret = wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        unknown_key_cbor,
+        sizeof unknown_key_cbor,
+        WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error);
+    WOLFSENTRY_EXIT_ON_FALSE(ret < 0);
+    ret = wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        internal_route_flag_cbor,
+        sizeof internal_route_flag_cbor,
+        WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error);
+    WOLFSENTRY_EXIT_ON_FALSE(WOLFSENTRY_ERROR_CODE_IS(ret, CONFIG_INVALID_KEY));
+
+#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        int_key_user_values_cbor,
+        sizeof int_key_user_values_cbor,
+        WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "answer",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &value));
+    WOLFSENTRY_EXIT_ON_FALSE(value == 42);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "typed",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &value));
+    WOLFSENTRY_EXIT_ON_FALSE(value == -7);
+    ret = wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        int_user_value_name_cbor,
+        sizeof int_user_value_name_cbor,
+        WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error);
+    WOLFSENTRY_EXIT_ON_FALSE(WOLFSENTRY_ERROR_CODE_IS(ret, CONFIG_INVALID_KEY));
+#endif
+
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_shutdown(
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(&wolfsentry)));
+    WOLFSENTRY_EXIT_ON_FAILURE(WOLFSENTRY_THREAD_TAILER(
+        WOLFSENTRY_THREAD_FLAG_NONE));
+
+    return 0;
+}
+#elif defined(WOLFSENTRY_NO_DOUBLE) && \
     !defined(WOLFSENTRY_TEST_CBOR_TOTAL_LIMIT) && \
     !defined(WOLFSENTRY_TEST_CBOR_NESTING_LIMIT)
 static int test_cbor(void)

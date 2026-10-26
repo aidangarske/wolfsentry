@@ -188,9 +188,11 @@ jobs:
           - no-text-numbers
           - no-text-addresses
           - no-double
+          - no-text-keys
           - minimal
           - minimal-no-json
           - reduced
+          - reduced-no-text-keys
           - total-limit
           - nesting-limit
           - user-settings

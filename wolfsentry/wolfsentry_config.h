@@ -37,6 +37,7 @@
  * WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS requires native CBOR numeric values.
  * WOLFSENTRY_CONFIG_NO_TEXT_ADDRESSES requires native CBOR byte-string addresses.
  * WOLFSENTRY_CONFIG_NO_ERROR_MESSAGES omits detailed parser error messages.
+ * WOLFSENTRY_CONFIG_NO_TEXT_KEYS requires the integer CBOR keys in wolfsentry_cbor.h.
  * WOLFSENTRY_CONFIG_MINIMAL enables the four section-omission options.
  */
 #ifdef WOLFSENTRY_CONFIG_MINIMAL
