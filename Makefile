@@ -211,6 +211,10 @@ ifndef C_WARNFLAGS
         MAYBE_WARN_PACKED_NOT_ALIGNED := $(shell $(CC) -E -Wpacked-not-aligned -x c /dev/null >/dev/null 2>&1 && echo -Wpacked-not-aligned)
         C_WARNFLAGS += -Wjump-misses-init -Wlogical-op -Wlogical-not-parentheses $(MAYBE_WARN_PACKED_NOT_ALIGNED)
     endif
+    # size optimization declines to inline calls on cold paths
+    ifneq "$(filter -Os -Oz,$(OPTIM))" ""
+        C_WARNFLAGS += -Wno-inline
+    endif
 endif
 
 CFLAGS := -I$(BUILD_TOP) -I$(SRC_TOP) $(OPTIM) $(DEBUG) $(C_WARNFLAGS) $(LWIP_CFLAGS) $(WOLFIP_CFLAGS) $(WOLFCOSE_CFLAGS) $(RUNTIME_CFLAGS) $(EXTRA_CFLAGS)
