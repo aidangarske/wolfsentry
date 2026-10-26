@@ -114,51 +114,47 @@ matching make option is `NO_CONFIG_ERROR_MESSAGES`.
 
 ## Measured footprint
 
-The following linked sizes were measured on x86-64 macOS with Apple Clang
-`-Os` and dead section removal. The baseline also used `SINGLETHREADED=1`,
-`NO_STDIO_STREAMS=1`, `NO_ADDR_BITMASK_MATCHING=1`, `NO_IPV6=1`,
-`WOLFSENTRY_NO_GETPROTOBY`, and `WOLFSENTRY_NO_ERROR_STRINGS`.
+Linked flash (text, read-only data, and data) of a minimal application on a
+Cortex-M33, built with arm-none-eabi-gcc 13.2.1, `-Os`, newlib-nano,
+`FUNCTION_SECTIONS=1`, `SINGLETHREADED=1`, and `NO_STDIO_STREAMS=1`, including
+libc and wolfCOSE. `make footprint-test` checks the engine and JSON sizes.
 
-| Make option | Linked bytes | Bytes saved | Removed capability |
-| --- | ---: | ---: | --- |
-| Full CBOR configuration | 47,822 | 0 | None |
-| `NO_CONFIG_TRANSACTIONS=1` | 41,926 | 5,896 | Dry run and atomic commit |
-| `NO_CONFIG_ROUTES=1` | 39,020 | 8,802 | Static route loading |
-| `NO_CONFIG_ADDR_FAMILY_NAMES=1` | 43,795 | 4,027 | Named route families |
-| `NO_CONFIG_ROUTE_ENDPOINTS=1` | 44,676 | 3,146 | Remote and local endpoints |
-| `NO_CONFIG_EVENTS=1` | 43,713 | 4,109 | Event loading |
-| `NO_CONFIG_USER_VALUES=1` | 42,602 | 5,220 | User-value loading |
-| `NO_CONFIG_EVENTCONFIG=1` | 43,611 | 4,211 | Global and per-event settings |
-| `MINIMAL_CONFIG=1` | 25,336 | 22,486 | Routes, events, user values, and event settings |
+| Build | Bytes |
+| --- | ---: |
+| JSON configuration (default) | 72,568 |
+| JSON configuration with `NO_DOUBLE=1` | 52,285 |
+| Full CBOR configuration | 63,632 |
+| `MINIMAL_CONFIG=1` | 25,913 |
+| Engine only (`NO_JSON=1`) | 15,415 |
+| Engine only, lean options below, `LTO=1` | 10,656 |
 
-Each row enables one option against the full baseline. Savings overlap and are
-not additive. Results vary with the target, compiler, C library, and enabled
-wolfSentry features.
+For the IDPS profile, each row adds one option to the row above. The profile
+keeps routes, endpoints, events, actions, default policies, and event
+configuration:
 
-The recommended profile below keeps routes, endpoints, events, actions,
-default policies, and event configuration for an IDPS. Each row adds one
-option to the preceding row:
-
-| Added make option | Linked bytes | Incremental saving |
+| Added make option | Bytes | Saving |
 | --- | ---: | ---: |
-| `NO_CONFIG_USER_VALUES=1 NO_CONFIG_ADDR_FAMILY_NAMES=1` | 38,575 | 9,247 |
-| `NO_CONFIG_TRANSACTIONS=1` | 32,675 | 5,900 |
-| `NO_CONFIG_LEGACY_EVENT_SYNTAX=1` | 32,061 | 614 |
-| `NO_CONFIG_TEXT_NUMBERS=1` | 30,459 | 1,602 |
-| `NO_CONFIG_ERROR_MESSAGES=1` | 30,017 | 442 |
-| `NO_CONFIG_TEXT_ADDRESSES=1` | 29,131 | 886 |
+| Full CBOR configuration | 63,632 | |
+| `NO_CONFIG_USER_VALUES=1 NO_CONFIG_ADDR_FAMILY_NAMES=1` | 39,337 | 24,295 |
+| `NO_CONFIG_TRANSACTIONS=1` | 36,209 | 3,128 |
+| `NO_CONFIG_LEGACY_EVENT_SYNTAX=1` | 35,661 | 548 |
+| `NO_CONFIG_TEXT_NUMBERS=1` | 33,925 | 1,736 |
+| `NO_CONFIG_ERROR_MESSAGES=1` | 30,544 | 3,381 |
+| `NO_CONFIG_TEXT_ADDRESSES=1` | 29,880 | 664 |
+| `NO_CONFIG_TEXT_KEYS=1` | 28,376 | 1,504 |
+| `NO_DOUBLE=1` | 27,308 | 1,068 |
+| Lean: `NO_IPV6=1 NO_ADDR_BITMASK_MATCHING=1`, `WOLFSENTRY_NO_ERROR_STRINGS`, `WOLFSENTRY_NO_PROTOCOL_NAMES` | 22,292 | 5,016 |
+| `LTO=1` | 18,404 | 3,888 |
 
-This profile is 18,691 bytes smaller than the full CBOR configuration build:
+`NO_CONFIG_TEXT_KEYS=1` requires policies encoded with the integer keys in
+`wolfsentry_cbor.h`. Results vary with the target, compiler, and C library.
 
 ```sh
 make WOLFCOSE=1 NO_JSON=1 \
-    NO_CONFIG_USER_VALUES=1 \
-    NO_CONFIG_ADDR_FAMILY_NAMES=1 \
-    NO_CONFIG_TRANSACTIONS=1 \
-    NO_CONFIG_LEGACY_EVENT_SYNTAX=1 \
-    NO_CONFIG_TEXT_NUMBERS=1 \
-    NO_CONFIG_TEXT_ADDRESSES=1 \
-    NO_CONFIG_ERROR_MESSAGES=1
+    NO_CONFIG_USER_VALUES=1 NO_CONFIG_ADDR_FAMILY_NAMES=1 \
+    NO_CONFIG_TRANSACTIONS=1 NO_CONFIG_LEGACY_EVENT_SYNTAX=1 \
+    NO_CONFIG_TEXT_NUMBERS=1 NO_CONFIG_ERROR_MESSAGES=1 \
+    NO_CONFIG_TEXT_ADDRESSES=1 NO_CONFIG_TEXT_KEYS=1 NO_DOUBLE=1
 ```
 
 ## Measured loading speed
