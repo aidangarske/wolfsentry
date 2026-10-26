@@ -123,6 +123,7 @@ topic.
 | `STATIC` | | Build statically linked unit tests |
 | `STRIPPED` | | Strip binaries of debugging symbols |
 | `FUNCTION_SECTIONS` | | Cull any unused object code (with function granularity) to minimize total size. |
+| `LTO` | | Build with link-time optimization, and link the application with `-flto` to get the size reduction. With clang, also use an LTO-capable archiver and linker such as `llvm-ar` and `lld` |
 | `BUILD_DYNAMIC` | | Build dynamically linked library |
 | `VERY_QUIET` | | Inhibit all non-error output during build |
 | `TAR` | | Path to GNU tar binary for `make dist`, should be set to `gtar` for macOS |

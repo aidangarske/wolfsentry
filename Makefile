@@ -199,6 +199,14 @@ ifndef CLANG
     CLANG := clang
 endif
 
+ifdef LTO
+    ifeq "$(CC_IS_GCC)" "1"
+        ifneq "$(shell command -v '$(CC)-ar' 2>/dev/null)" ""
+            AR := $(CC)-ar
+        endif
+    endif
+endif
+
 AS_VERSION := $(shell $(AS) --version 2>&1 | sed "s/[\`']/'\\\\''/g")
 LD_VERSION := $(shell $(LD) --version 2>&1 | sed "s/[\`']/'\\\\''/g")
 AR_VERSION := $(shell $(AR) --version 2>&1 | sed "s/[\`']/'\\\\''/g")
@@ -211,8 +219,8 @@ ifndef C_WARNFLAGS
         MAYBE_WARN_PACKED_NOT_ALIGNED := $(shell $(CC) -E -Wpacked-not-aligned -x c /dev/null >/dev/null 2>&1 && echo -Wpacked-not-aligned)
         C_WARNFLAGS += -Wjump-misses-init -Wlogical-op -Wlogical-not-parentheses $(MAYBE_WARN_PACKED_NOT_ALIGNED)
     endif
-    # size optimization declines to inline calls on cold paths
-    ifneq "$(filter -Os -Oz,$(OPTIM))" ""
+    # size optimization and LTO decline to inline calls on cold paths
+    ifneq "$(filter -Os -Oz,$(OPTIM))$(LTO)" ""
         C_WARNFLAGS += -Wno-inline
     endif
 endif
@@ -349,6 +357,18 @@ endif
 ifdef FUNCTION_SECTIONS
     CFLAGS += -ffunction-sections -fdata-sections
     LDFLAGS += -Wl,--gc-sections
+endif
+
+ifdef LTO
+    # table lookups return entries through (struct wolfsentry_table_ent_header **) casts
+    CFLAGS += -fno-strict-aliasing
+    ifeq "$(CC_IS_GCC)" "1"
+        CFLAGS += -flto=auto -ffat-lto-objects
+        LDFLAGS += -flto=auto
+    else
+        CFLAGS += -flto
+        LDFLAGS += -flto
+    endif
 endif
 
 .PHONY: all

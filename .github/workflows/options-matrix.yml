@@ -67,6 +67,8 @@ jobs:
             target: no-ipv6-test
           - name: No double
             target: no-double-test
+          - name: LTO
+            target: lto-test
           - name: C99
             target: c99-test
           - name: No alloca
