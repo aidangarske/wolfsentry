@@ -69,6 +69,8 @@ jobs:
             target: no-double-test
           - name: LTO
             target: lto-test
+          - name: Policy to C
+            target: policy-to-c-test
           - name: C99
             target: c99-test
           - name: No alloca

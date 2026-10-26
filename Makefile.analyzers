@@ -543,6 +543,30 @@ no-addr-bitmask-matching-test:
 	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-addr-bitmask-matching-builds" clean
 	@echo "passed: NO_ADDR_BITMASK_MATCHING test."
 
+POLICY_TO_C := $(BUILD_TOP)/tools/wolfsentry-policy-to-c
+ANALYZER_BUILD_ARTIFACTS += $(POLICY_TO_C) $(BUILD_TOP)/tests/compiled-policy.c $(BUILD_TOP)/tests/policy-to-c-check
+
+$(POLICY_TO_C): $(SRC_TOP)/tools/policy-to-c.c $(BUILD_TOP)/$(LIB_NAME) $(OPTIONS_FILE)
+	$(Q)[ -d $(dir $@) ] || mkdir -p $(dir $@)
+	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(BUILD_TOP)/$(LIB_NAME) $(TEST_LIBS)
+
+.PHONY: policy-to-c
+policy-to-c: $(POLICY_TO_C)
+
+POLICY_TO_C_TEST_ACTIONS := handle-insert handle-delete handle-match handle-update handle-connect handle-connect2 notify-on-decision
+POLICY_TO_C_TEST_CONFIGS := $(SRC_TOP)/tests/policy-to-c-test.json
+
+.PHONY: policy-to-c-test
+policy-to-c-test: $(POLICY_TO_C)
+	@mkdir -p '$(BUILD_TOP)/tests'
+	@! '$(POLICY_TO_C)' -n int '$(SRC_TOP)/tests/policy-to-c-test.json' > /dev/null 2>&1
+	@for config in $(POLICY_TO_C_TEST_CONFIGS); do \
+		'$(POLICY_TO_C)' $(addprefix -a ,$(POLICY_TO_C_TEST_ACTIONS)) "$$config" > '$(BUILD_TOP)/tests/compiled-policy.c' && \
+		$(CC) $(CFLAGS) $(LDFLAGS) -o '$(BUILD_TOP)/tests/policy-to-c-check' '$(SRC_TOP)/tests/policy-to-c-check.c' '$(BUILD_TOP)/tests/compiled-policy.c' '$(BUILD_TOP)/$(LIB_NAME)' $(TEST_LIBS) && \
+		'$(BUILD_TOP)/tests/policy-to-c-check' "$$config" $(POLICY_TO_C_TEST_ACTIONS) || exit 1; \
+	done
+	@echo "passed: policy-to-c test."
+
 $(BUILD_TOP)/tests/footprint: $(SRC_TOP)/tests/footprint.c $(BUILD_TOP)/$(LIB_NAME) $(OPTIONS_FILE) $(WOLFCOSE_LINK_DEPS)
 	$(Q)[ -d $(dir $@) ] || mkdir -p $(dir $@)
 	$(Q)$(CC) $(CFLAGS) $(FOOTPRINT_APP_CFLAGS) $(LDFLAGS) -specs=nosys.specs -Wl,--unresolved-symbols=ignore-all -o $@ $< $(BUILD_TOP)/$(LIB_NAME) $(TEST_LIBS)
@@ -961,7 +985,7 @@ doc-check:
 	@echo "passed: doc-check."
 
 .PHONY: check
-check: dynamic-build-test c99-test wolfcose-test no-alloca-test singlethreaded-test no-json-test no-json-dom-test no-error-strings-test no-protocol-names-test no-getprotoby-test no-stdio-streams-build-test minimal-build-test minimal-threaded-build-test user-settings-build-test short-enums-test no-addr-bitmask-matching-test no-ipv6-test no-double-test lto-test
+check: dynamic-build-test c99-test wolfcose-test no-alloca-test singlethreaded-test no-json-test no-json-dom-test no-error-strings-test no-protocol-names-test no-getprotoby-test no-stdio-streams-build-test minimal-build-test minimal-threaded-build-test user-settings-build-test short-enums-test no-addr-bitmask-matching-test no-ipv6-test no-double-test lto-test policy-to-c-test
 
 .PHONY: check-extra
 check-extra: library-dependency-singlethreaded-build-test library-dependency-multithreaded-build-test pahole-test route-holes-test static-build-test c89-test c23-test no-inline-test m32-test m32-c89-test m32-c23-test fortify-source-test CALL_TRACE-test small-PRIVATE_DATA_ALIGNMENT-test big-PRIVATE_DATA_ALIGNMENT-test HPI_POSIX_VANILLA-test no-malloc-builtins-test stripped-function-sections-test optim-O0-test freertos-arm32-thumb-build-test freertos-arm32-build-test freertos-arm32-singlethreaded-build-test freertos-arm32-c89-build-test linux-lwip-test linux-lwip-test-no-ipv6 linux-lwip-c89-m32-test dist-check release-check doc-check notification-demo-build-test .WAIT benchmark-test benchmark-singlethreaded-test

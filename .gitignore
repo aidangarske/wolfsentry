@@ -19,6 +19,10 @@ configure
 .#*
 
 tests/test_*
+/tests/compiled-policy.c
+/tests/policy-to-c-check
+/tools/wolfsentry-policy-to-c
+*.dSYM/
 /.build_params
 /.tested
 wolfsentry/wolfsentry_options.h

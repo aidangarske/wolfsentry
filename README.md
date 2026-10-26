@@ -46,6 +46,11 @@ JSON configuration is documented in detail by [doc/json_configuration.md](doc/js
 CBOR configuration through wolfCOSE is documented in
 [doc/cbor_configuration.md](doc/cbor_configuration.md).
 
+For a device with a fixed policy, `make policy-to-c` builds
+`tools/wolfsentry-policy-to-c`, which converts a JSON policy into a C function
+that installs it through the API, so the device can omit the configuration
+loader. Pass `-a <label>` for each application action the policy names.
+
 With `doxygen` installed, the HTML version of the full API reference manual can
 be generated from the top of the wolfSentry source tree with `make doc-html`.
 This, and the source code itself, are the recommended API references.
