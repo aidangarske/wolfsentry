@@ -108,7 +108,9 @@ struct config_number {
     union {
         uint64_t uint_value;
         int64_t sint_value;
+#ifndef WOLFSENTRY_NO_DOUBLE
         double float_value;
+#endif
     } value;
 };
 #endif
@@ -561,7 +563,8 @@ static wolfsentry_errcode_t convert_uint8(
 }
 #endif
 
-#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+#if !defined(WOLFSENTRY_CONFIG_NO_USER_VALUES) && \
+    !defined(WOLFSENTRY_NO_DOUBLE)
 static wolfsentry_errcode_t convert_double(
     JSON_TYPE type,
     const unsigned char *data,
@@ -1776,6 +1779,7 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
                     i,
                     0);
             } while(0);
+#ifndef WOLFSENTRY_NO_DOUBLE
             if (! WOLFSENTRY_ERROR_CODE_IS(ret, OK)) {
                 double d;
                 if ((ret = convert_double(json_type, data, data_size, &d)) < 0)
@@ -1787,6 +1791,7 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
                     d,
                     0);
             }
+#endif
             jps->object_under_construction = O_U_C_NONE;
             WOLFSENTRY_ERROR_RERETURN(ret);
 #ifdef WOLFSENTRY_WOLFCOSE
@@ -1794,9 +1799,11 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
             {
                 const struct config_number *number =
                     get_config_number(json_type, data, data_size);
+                int64_t value;
 
                 if (number == NULL)
                     WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+#ifndef WOLFSENTRY_NO_DOUBLE
                 if (number->type == CONFIG_NUMBER_FLOAT) {
                     ret = wolfsentry_user_value_store_double(
                         JPS_WOLFSENTRY_CONTEXT_ARGS_OUT,
@@ -1804,24 +1811,24 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
                         WOLFSENTRY_LENGTH_NULL_TERMINATED,
                         number->value.float_value,
                         0);
-                } else {
-                    int64_t value;
-
-                    if (number->type == CONFIG_NUMBER_SINT)
-                        value = number->value.sint_value;
-                    else if ((number->type == CONFIG_NUMBER_UINT) &&
-                             (number->value.uint_value <= (uint64_t)INT64_MAX))
-                    {
-                        value = (int64_t)number->value.uint_value;
-                    } else
-                        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-                    ret = wolfsentry_user_value_store_sint(
-                        JPS_WOLFSENTRY_CONTEXT_ARGS_OUT,
-                        jps->cur_keyname,
-                        WOLFSENTRY_LENGTH_NULL_TERMINATED,
-                        value,
-                        0);
+                    jps->object_under_construction = O_U_C_NONE;
+                    WOLFSENTRY_ERROR_RERETURN(ret);
                 }
+#endif
+                if (number->type == CONFIG_NUMBER_SINT)
+                    value = number->value.sint_value;
+                else if ((number->type == CONFIG_NUMBER_UINT) &&
+                         (number->value.uint_value <= (uint64_t)INT64_MAX))
+                {
+                    value = (int64_t)number->value.uint_value;
+                } else
+                    WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+                ret = wolfsentry_user_value_store_sint(
+                    JPS_WOLFSENTRY_CONTEXT_ARGS_OUT,
+                    jps->cur_keyname,
+                    WOLFSENTRY_LENGTH_NULL_TERMINATED,
+                    value,
+                    0);
                 jps->object_under_construction = O_U_C_NONE;
                 WOLFSENTRY_ERROR_RERETURN(ret);
             }
@@ -1983,6 +1990,9 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
                 0));
         }
         case WOLFSENTRY_KV_FLOAT: {
+#ifdef WOLFSENTRY_NO_DOUBLE
+            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+#else
             double d;
             if ((ret = convert_double(json_type, data, data_size, &d)) < 0)
                 WOLFSENTRY_ERROR_RERETURN(ret);
@@ -1992,6 +2002,7 @@ static wolfsentry_errcode_t handle_user_value_clause(struct wolfsentry_json_proc
                 jps->o_u_c.user_value.label_len,
                 d,
                 0));
+#endif
         }
         case WOLFSENTRY_KV_STRING:
             if (data_size >= WOLFSENTRY_KV_MAX_VALUE_BYTES)
@@ -2601,6 +2612,7 @@ struct cbor_container_state {
     unsigned char expecting_key;
 };
 
+#ifndef WOLFSENTRY_NO_DOUBLE
 static float cbor_half_to_float(uint16_t half)
 {
     uint32_t sign = ((uint32_t)half & 0x8000U) << 16U;
@@ -2630,12 +2642,16 @@ static float cbor_half_to_float(uint16_t half)
     memcpy(&value, &bits, sizeof value);
     return value;
 }
+#endif
 
 static wolfsentry_errcode_t cbor_decode_number(
     const WOLFCOSE_CBOR_ITEM *item,
     unsigned char additional_info,
     struct config_number *number)
 {
+#ifdef WOLFSENTRY_NO_DOUBLE
+    (void)additional_info;
+#endif
     if (item->majorType == WOLFCOSE_CBOR_UINT) {
         number->type = CONFIG_NUMBER_UINT;
         number->value.uint_value = item->val;
@@ -2644,7 +2660,9 @@ static wolfsentry_errcode_t cbor_decode_number(
             WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_SMALL);
         number->type = CONFIG_NUMBER_SINT;
         number->value.sint_value = -1 - (int64_t)item->val;
-    } else if (additional_info == WOLFCOSE_CBOR_AI_FLOAT16) {
+    }
+#ifndef WOLFSENTRY_NO_DOUBLE
+    else if (additional_info == WOLFCOSE_CBOR_AI_FLOAT16) {
         number->type = CONFIG_NUMBER_FLOAT;
         number->value.float_value =
             (double)cbor_half_to_float((uint16_t)item->val);
@@ -2660,7 +2678,9 @@ static wolfsentry_errcode_t cbor_decode_number(
 
         number->type = CONFIG_NUMBER_FLOAT;
         memcpy(&number->value.float_value, &bits, sizeof bits);
-    } else {
+    }
+#endif
+    else {
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
     }
 
@@ -2725,7 +2745,9 @@ static wolfsentry_errcode_t cbor_emit_text_number(
             sizeof text,
             "%lld",
             (long long)number->value.sint_value);
-    } else if (number->type == CONFIG_NUMBER_FLOAT) {
+    }
+#ifndef WOLFSENTRY_NO_DOUBLE
+    else if (number->type == CONFIG_NUMBER_FLOAT) {
         char *decimal_point;
 
         number_len = snprintf(
@@ -2743,7 +2765,9 @@ static wolfsentry_errcode_t cbor_emit_text_number(
             text[number_len++] = '0';
             text[number_len] = 0;
         }
-    } else {
+    }
+#endif
+    else {
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
     }
 

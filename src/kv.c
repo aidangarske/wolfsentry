@@ -192,8 +192,10 @@ static inline int wolfsentry_kv_value_eq_1(struct wolfsentry_kv_pair *a, struct 
         return (WOLFSENTRY_KV_V_UINT(a) == WOLFSENTRY_KV_V_UINT(b));
     case WOLFSENTRY_KV_SINT:
         return (WOLFSENTRY_KV_V_SINT(a) == WOLFSENTRY_KV_V_SINT(b));
+#ifndef WOLFSENTRY_NO_DOUBLE
     case WOLFSENTRY_KV_FLOAT:
         return (WOLFSENTRY_KV_V_FLOAT(a) == WOLFSENTRY_KV_V_FLOAT(b));
+#endif
     case WOLFSENTRY_KV_STRING:
         if (WOLFSENTRY_KV_V_STRING_LEN(a) != WOLFSENTRY_KV_V_STRING_LEN(b))
             return 0;
@@ -430,9 +432,11 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_kv_render_value(
     case WOLFSENTRY_KV_SINT:
         *out_len = snprintf(out, out_space, "%ld", (long int)WOLFSENTRY_KV_V_SINT(kv));
         break;
+#ifndef WOLFSENTRY_NO_DOUBLE
     case WOLFSENTRY_KV_FLOAT:
         *out_len = snprintf(out, out_space, "%.10f", WOLFSENTRY_KV_V_FLOAT(kv));
         break;
+#endif
     case WOLFSENTRY_KV_STRING: {
 #ifndef WOLFSENTRY_HAVE_JSON_DOM
         *out_len = snprintf(out, out_space, "\"%.*s\"", (int)WOLFSENTRY_KV_V_STRING_LEN(kv), WOLFSENTRY_KV_V_STRING(kv));
@@ -886,6 +890,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_user_value_get_sint(
     WOLFSENTRY_RETURN_OK;
 }
 
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_user_value_store_double(
     WOLFSENTRY_CONTEXT_ARGS_IN,
     const char *key,
@@ -923,6 +928,7 @@ WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_user_value_get_float(
     *value = WOLFSENTRY_KV_V_FLOAT(&kv->kv);
     WOLFSENTRY_RETURN_OK;
 }
+#endif
 
 WOLFSENTRY_API wolfsentry_errcode_t wolfsentry_user_value_store_string(
     WOLFSENTRY_CONTEXT_ARGS_IN,

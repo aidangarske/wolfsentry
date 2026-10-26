@@ -323,6 +323,7 @@ WOLFCOSE_TEST_ARGS_no-error-messages := WOLFCOSE=1 NO_CONFIG_ERROR_MESSAGES=1
 WOLFCOSE_TEST_ARGS_no-protocol-names := WOLFCOSE=1 NO_JSON=1 EXTRA_CFLAGS+='-DWOLFSENTRY_NO_PROTOCOL_NAMES -DWOLFSENTRY_NO_ERROR_STRINGS'
 WOLFCOSE_TEST_ARGS_no-text-numbers := WOLFCOSE=1 NO_JSON=1 NO_CONFIG_TEXT_NUMBERS=1
 WOLFCOSE_TEST_ARGS_no-text-addresses := WOLFCOSE=1 NO_JSON=1 NO_CONFIG_TEXT_ADDRESSES=1
+WOLFCOSE_TEST_ARGS_no-double := WOLFCOSE=1 NO_DOUBLE=1
 WOLFCOSE_TEST_ARGS_minimal := WOLFCOSE=1 MINIMAL_CONFIG=1
 WOLFCOSE_TEST_ARGS_minimal-no-json := WOLFCOSE=1 NO_JSON=1 MINIMAL_CONFIG=1
 WOLFCOSE_TEST_ARGS_reduced := WOLFCOSE=1 NO_JSON=1 SINGLETHREADED=1 NO_CONFIG_USER_VALUES=1 NO_CONFIG_ADDR_FAMILY_NAMES=1 NO_CONFIG_TRANSACTIONS=1 NO_CONFIG_LEGACY_EVENT_SYNTAX=1 NO_CONFIG_TEXT_NUMBERS=1 NO_CONFIG_TEXT_ADDRESSES=1 NO_CONFIG_ERROR_MESSAGES=1
@@ -541,6 +542,13 @@ no-addr-bitmask-matching-test:
 	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-addr-bitmask-matching-builds" NO_ADDR_BITMASK_MATCHING=1 TEST_JSON_CFLAGS='-DTEST_JSON_CONFIG_PATH=\"$(SRC_TOP)/tests/test-config-no-bitmasks.json\" -DEXTRA_TEST_JSON_CONFIG_PATH=\"$(SRC_TOP)/tests/extra-test-config.json\" -DTEST_NUMERIC_JSON_CONFIG_PATH=\"$(SRC_TOP)/tests/test-config-numeric-no-bitmasks.json\"' test
 	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-addr-bitmask-matching-builds" clean
 	@echo "passed: NO_ADDR_BITMASK_MATCHING test."
+
+.PHONY: no-double-test
+no-double-test:
+	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-double-test-builds" NO_DOUBLE=1 clean
+	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-double-test-builds" NO_DOUBLE=1 test
+	@$(MAKE) $(EXTRA_MAKE_FLAGS) $(QUIET_FLAG) -f $(THIS_MAKEFILE) VERY_QUIET=1 BUILD_TOP="$(BUILD_PARENT)/wolfsentry-no-double-test-builds" NO_DOUBLE=1 clean
+	@echo "passed: NO_DOUBLE test."
 
 .PHONY: no-ipv6-test
 no-ipv6-test:
@@ -921,7 +929,7 @@ doc-check:
 	@echo "passed: doc-check."
 
 .PHONY: check
-check: dynamic-build-test c99-test wolfcose-test no-alloca-test singlethreaded-test no-json-test no-json-dom-test no-error-strings-test no-protocol-names-test no-getprotoby-test no-stdio-streams-build-test minimal-build-test minimal-threaded-build-test user-settings-build-test short-enums-test no-addr-bitmask-matching-test no-ipv6-test
+check: dynamic-build-test c99-test wolfcose-test no-alloca-test singlethreaded-test no-json-test no-json-dom-test no-error-strings-test no-protocol-names-test no-getprotoby-test no-stdio-streams-build-test minimal-build-test minimal-threaded-build-test user-settings-build-test short-enums-test no-addr-bitmask-matching-test no-ipv6-test no-double-test
 
 .PHONY: check-extra
 check-extra: library-dependency-singlethreaded-build-test library-dependency-multithreaded-build-test pahole-test route-holes-test static-build-test c89-test c23-test no-inline-test m32-test m32-c89-test m32-c23-test fortify-source-test CALL_TRACE-test small-PRIVATE_DATA_ALIGNMENT-test big-PRIVATE_DATA_ALIGNMENT-test HPI_POSIX_VANILLA-test no-malloc-builtins-test stripped-function-sections-test optim-O0-test freertos-arm32-thumb-build-test freertos-arm32-build-test freertos-arm32-singlethreaded-build-test freertos-arm32-c89-build-test linux-lwip-test linux-lwip-test-no-ipv6 linux-lwip-c89-m32-test dist-check release-check doc-check notification-demo-build-test .WAIT benchmark-test benchmark-singlethreaded-test

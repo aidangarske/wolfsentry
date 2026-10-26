@@ -325,7 +325,9 @@ WOLFSENTRY_API int32_t json_number_to_int32(const unsigned char* num, size_t num
 WOLFSENTRY_API uint32_t json_number_to_uint32(const unsigned char* num, size_t num_size);
 WOLFSENTRY_API int64_t json_number_to_int64(const unsigned char* num, size_t num_size);
 WOLFSENTRY_API uint64_t json_number_to_uint64(const unsigned char* num, size_t num_size);
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API int json_number_to_double(const unsigned char* num, size_t num_size, double* p_result);
+#endif
 
 
 typedef int (*JSON_DUMP_CALLBACK)(const unsigned char* /*str*/, size_t /*size*/, void* /*user_data*/);
@@ -350,7 +352,9 @@ WOLFSENTRY_API int json_dump_int32(int32_t i32, JSON_DUMP_CALLBACK write_func, v
 WOLFSENTRY_API int json_dump_uint32(uint32_t u32, JSON_DUMP_CALLBACK write_func, void* user_data);
 WOLFSENTRY_API int json_dump_int64(int64_t i64, JSON_DUMP_CALLBACK write_func, void* user_data);
 WOLFSENTRY_API int json_dump_uint64(uint64_t u64, JSON_DUMP_CALLBACK write_func, void* user_data);
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API int json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data);
+#endif
 WOLFSENTRY_API int json_dump_string(const unsigned char* str, size_t size, JSON_DUMP_CALLBACK write_func, void* user_data);
 
 

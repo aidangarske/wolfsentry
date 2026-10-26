@@ -3682,6 +3682,7 @@ static int test_user_values(void) {
             -12345678L,
             0));
 
+#ifndef WOLFSENTRY_NO_DOUBLE
     WOLFSENTRY_EXIT_ON_FAILURE(
         wolfsentry_user_value_store_double(
             WOLFSENTRY_CONTEXT_ARGS_OUT,
@@ -3710,6 +3711,7 @@ static int test_user_values(void) {
             WOLFSENTRY_LENGTH_NULL_TERMINATED,
             123.45678,
             0));
+#endif
 
     {
         static const char test_string[] = "abc123";
@@ -3901,7 +3903,11 @@ static int test_user_values(void) {
         WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_values_iterate_end(WOLFSENTRY_CONTEXT_ARGS_OUT, &cursor));
         WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_context_unlock(WOLFSENTRY_CONTEXT_ARGS_OUT));
         WOLFSENTRY_EXIT_ON_FALSE(n_seen == wolfsentry->user_values->header.n_ents);
+#ifdef WOLFSENTRY_NO_DOUBLE
+        WOLFSENTRY_EXIT_ON_FALSE(n_seen == 5);
+#else
         WOLFSENTRY_EXIT_ON_FALSE(n_seen == 6);
+#endif
     }
 #endif
 
@@ -4377,7 +4383,8 @@ static int test_cbor_rejections(WOLFSENTRY_CONTEXT_ARGS_IN)
 }
 
 #if !defined(WOLFSENTRY_CONFIG_NO_ROUTES) && \
-    !defined(WOLFSENTRY_CONFIG_NO_ROUTE_ENDPOINTS)
+    !defined(WOLFSENTRY_CONFIG_NO_ROUTE_ENDPOINTS) && \
+    !defined(WOLFSENTRY_NO_DOUBLE)
 static int test_cbor_binary_route(WOLFSENTRY_CONTEXT_ARGS_IN)
 {
     static const byte expected_remote[] = { 0xc0, 0x00, 0x02, 0x01 };
@@ -4545,6 +4552,130 @@ static int test_cbor_limits(void)
 }
 #endif
 
+#if defined(WOLFSENTRY_NO_DOUBLE) && \
+    !defined(WOLFSENTRY_TEST_CBOR_TOTAL_LIMIT) && \
+    !defined(WOLFSENTRY_TEST_CBOR_NESTING_LIMIT)
+static int test_cbor(void)
+{
+#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+    static const unsigned char integer_values_cbor[] = {
+        0xa2, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01, 0x6b, 0x75, 0x73, 0x65, 0x72, 0x2d, 0x76,
+        0x61, 0x6c, 0x75, 0x65, 0x73, 0xa2, 0x66, 0x61, 0x6e, 0x73, 0x77, 0x65,
+        0x72, 0x18, 0x2a, 0x65, 0x74, 0x79, 0x70, 0x65, 0x64, 0xa1, 0x64, 0x73,
+        0x69, 0x6e, 0x74, 0x26
+    };
+    static const unsigned char float16_value_cbor[] = {
+        0xa2, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01, 0x6b, 0x75, 0x73, 0x65, 0x72, 0x2d, 0x76,
+        0x61, 0x6c, 0x75, 0x65, 0x73, 0xa1, 0x61, 0x78, 0xf9, 0x3e, 0x00
+    };
+    static const unsigned char float32_value_cbor[] = {
+        0xa2, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01, 0x6b, 0x75, 0x73, 0x65, 0x72, 0x2d, 0x76,
+        0x61, 0x6c, 0x75, 0x65, 0x73, 0xa1, 0x61, 0x78, 0xfa, 0x3f, 0xc0, 0x00,
+        0x00
+    };
+    static const unsigned char float64_value_cbor[] = {
+        0xa2, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01, 0x6b, 0x75, 0x73, 0x65, 0x72, 0x2d, 0x76,
+        0x61, 0x6c, 0x75, 0x65, 0x73, 0xa1, 0x61, 0x78, 0xfb, 0x3f, 0xf8, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    static const unsigned char typed_float_cbor[] = {
+        0xa2, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01, 0x6b, 0x75, 0x73, 0x65, 0x72, 0x2d, 0x76,
+        0x61, 0x6c, 0x75, 0x65, 0x73, 0xa1, 0x61, 0x78, 0xa1, 0x65, 0x66, 0x6c,
+        0x6f, 0x61, 0x74, 0x01
+    };
+#ifdef WOLFSENTRY_HAVE_JSON_DOM
+    static const unsigned char json_float_cbor[] = {
+        0xa2, 0x78, 0x19, 0x77, 0x6f, 0x6c, 0x66, 0x73, 0x65, 0x6e, 0x74, 0x72,
+        0x79, 0x2d, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2d, 0x76, 0x65, 0x72,
+        0x73, 0x69, 0x6f, 0x6e, 0x01, 0x6b, 0x75, 0x73, 0x65, 0x72, 0x2d, 0x76,
+        0x61, 0x6c, 0x75, 0x65, 0x73, 0xa1, 0x61, 0x78, 0xa1, 0x64, 0x6a, 0x73,
+        0x6f, 0x6e, 0x81, 0xfb, 0x3f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+#endif
+    static const struct {
+        const unsigned char *data;
+        size_t len;
+    } float_values[] = {
+        { float16_value_cbor, sizeof float16_value_cbor },
+        { float32_value_cbor, sizeof float32_value_cbor },
+        { float64_value_cbor, sizeof float64_value_cbor },
+#ifdef WOLFSENTRY_HAVE_JSON_DOM
+        { json_float_cbor, sizeof json_float_cbor },
+#endif
+        { typed_float_cbor, sizeof typed_float_cbor }
+    };
+    int64_t value = 0;
+    size_t i;
+    wolfsentry_errcode_t ret;
+#endif
+    struct wolfsentry_context *wolfsentry = NULL;
+    struct wolfsentry_eventconfig initial_config;
+    char error[160];
+    WOLFSENTRY_THREAD_HEADER_CHECKED(WOLFSENTRY_THREAD_FLAG_NONE);
+
+    memset(&initial_config, 0, sizeof initial_config);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_init(
+        wolfsentry_build_settings,
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(WOLFSENTRY_TEST_HPI),
+        &initial_config,
+        &wolfsentry));
+    WOLFSENTRY_EXIT_ON_FALSE(test_cbor_rejections(
+        WOLFSENTRY_CONTEXT_ARGS_OUT) == 0);
+
+#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_config_cbor_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        integer_values_cbor,
+        sizeof integer_values_cbor,
+        TEST_CBOR_COMMIT_FLAGS,
+        error,
+        sizeof error));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "answer",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &value));
+    WOLFSENTRY_EXIT_ON_FALSE(value == 42);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "typed",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &value));
+    WOLFSENTRY_EXIT_ON_FALSE(value == -7);
+
+    for (i = 0U; i < (sizeof float_values / sizeof float_values[0]); ++i) {
+        ret = wolfsentry_config_cbor_oneshot(
+            WOLFSENTRY_CONTEXT_ARGS_OUT,
+            float_values[i].data,
+            float_values[i].len,
+            WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | TEST_CBOR_COMMIT_FLAGS,
+            error,
+            sizeof error);
+        WOLFSENTRY_EXIT_ON_FALSE(
+            WOLFSENTRY_ERROR_CODE_IS(ret, CONFIG_INVALID_VALUE));
+    }
+#else
+    (void)error;
+#endif
+
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_shutdown(
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(&wolfsentry)));
+    WOLFSENTRY_EXIT_ON_FAILURE(WOLFSENTRY_THREAD_TAILER(
+        WOLFSENTRY_THREAD_FLAG_NONE));
+
+    return 0;
+}
+#else
 static int test_cbor(void)
 {
 #if defined(WOLFSENTRY_TEST_CBOR_TOTAL_LIMIT) || \
@@ -5411,6 +5542,7 @@ static int test_cbor(void)
 #endif
 #endif
 }
+#endif
 
 #undef TEST_CBOR_COMMIT_FLAGS
 
@@ -5423,6 +5555,108 @@ static int test_cbor(void)
 #include <wolfsentry/centijson_dom.h>
 #endif
 
+#ifdef WOLFSENTRY_NO_DOUBLE
+static int test_json(const char *fname, const char *extra_fname) {
+    static const unsigned char valid_config[] =
+        "{\"wolfsentry-config-version\":1,\"default-policies\":"
+        "{\"default-policy\":\"reject\"}}";
+#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+    static const unsigned char integer_values[] =
+        "{\"wolfsentry-config-version\":1,\"user-values\":"
+        "{\"answer\":42,\"typed\":{\"sint\":-7}}}";
+    static const char *const float_values[] = {
+        "{\"wolfsentry-config-version\":1,\"user-values\":{\"x\":1.5}}",
+#ifdef WOLFSENTRY_HAVE_JSON_DOM
+        "{\"wolfsentry-config-version\":1,\"user-values\":"
+        "{\"x\":{\"json\":[1.5]}}}",
+#endif
+        "{\"wolfsentry-config-version\":1,\"user-values\":"
+        "{\"x\":{\"float\":1}}}"
+    };
+    int64_t value = 0;
+    size_t i;
+    wolfsentry_errcode_t ret;
+#endif
+    struct wolfsentry_context *wolfsentry = NULL;
+    struct wolfsentry_eventconfig config;
+    wolfsentry_config_load_flags_t load_flags;
+#ifdef WOLFSENTRY_HAVE_JSON_DOM
+    JSON_VALUE int_value;
+#endif
+    WOLFSENTRY_THREAD_HEADER_CHECKED(WOLFSENTRY_THREAD_FLAG_NONE);
+
+    (void)fname;
+    (void)extra_fname;
+#ifdef WOLFSENTRY_CONFIG_NO_TRANSACTIONS
+    load_flags = WOLFSENTRY_CONFIG_LOAD_FLAG_NONE;
+#else
+    load_flags = WOLFSENTRY_CONFIG_LOAD_FLAG_LOAD_THEN_COMMIT;
+#endif
+    memset(&config, 0, sizeof config);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_init(
+        wolfsentry_build_settings,
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(WOLFSENTRY_TEST_HPI),
+        &config,
+        &wolfsentry));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_config_json_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        valid_config,
+        sizeof valid_config - 1U,
+        load_flags,
+        NULL,
+        0U));
+
+#ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_config_json_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        integer_values,
+        sizeof integer_values - 1U,
+        load_flags,
+        NULL,
+        0U));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "answer",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &value));
+    WOLFSENTRY_EXIT_ON_FALSE(value == 42);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        "typed",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED,
+        &value));
+    WOLFSENTRY_EXIT_ON_FALSE(value == -7);
+
+    for (i = 0U; i < (sizeof float_values / sizeof float_values[0]); ++i) {
+        ret = wolfsentry_config_json_oneshot(
+            WOLFSENTRY_CONTEXT_ARGS_OUT,
+            (const unsigned char *)float_values[i],
+            strlen(float_values[i]),
+            WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | load_flags,
+            NULL,
+            0U);
+        WOLFSENTRY_EXIT_ON_FALSE(ret < 0);
+    }
+#endif
+#ifdef WOLFSENTRY_HAVE_JSON_DOM
+    WOLFSENTRY_EXIT_ON_FALSE(json_value_init_int32(
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(wolfsentry_get_allocator(wolfsentry)),
+        &int_value, 5) == 0);
+    WOLFSENTRY_EXIT_ON_FALSE(json_value_is_compatible(&int_value, JSON_VALUE_INT64));
+    WOLFSENTRY_EXIT_ON_FALSE(! json_value_is_compatible(&int_value, JSON_VALUE_FLOAT));
+    WOLFSENTRY_EXIT_ON_FALSE(! json_value_is_compatible(&int_value, JSON_VALUE_DOUBLE));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_centijson_errcode_translate(json_value_fini(
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(wolfsentry_get_allocator(wolfsentry)),
+        &int_value)));
+#endif
+
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_shutdown(
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(&wolfsentry)));
+    WOLFSENTRY_EXIT_ON_FAILURE(WOLFSENTRY_THREAD_TAILER(
+        WOLFSENTRY_THREAD_FLAG_NONE));
+    WOLFSENTRY_RETURN_OK;
+}
+#else
 static int test_json(const char *fname, const char *extra_fname) {
 #if defined(WOLFSENTRY_CONFIG_NO_TRANSACTIONS) || \
     defined(WOLFSENTRY_CONFIG_NO_LEGACY_EVENT_SYNTAX)
@@ -6781,6 +7015,7 @@ static int test_json(const char *fname, const char *extra_fname) {
     WOLFSENTRY_RETURN_OK;
 #endif
 }
+#endif
 
 #endif /* TEST_JSON */
 

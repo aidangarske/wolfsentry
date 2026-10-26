@@ -134,6 +134,7 @@ topic.
 | `NO_IPV6` | `WOLFSENTRY_NO_IPV6` | Define to omit support for the IPv6 address family. |
 | `NO_JSON` | `WOLFSENTRY_NO_JSON` | Define to omit JSON configuration support |
 | `NO_JSON_DOM` | `WOLFSENTRY_NO_JSON_DOM` | Define to omit JSON DOM API |
+| `NO_DOUBLE` | `WOLFSENTRY_NO_DOUBLE` | Omit floating-point user values and number parsing; floating-point configuration values are rejected |
 | `WOLFCOSE` | `WOLFSENTRY_WOLFCOSE` | Enable CBOR configuration loading through wolfCOSE |
 | `WOLFCOSE_TOP` | | Path to the wolfCOSE source tree, defaulting to `../wolfCOSE` |
 | `WOLFCOSE_LIB` | | Path to the wolfCOSE library for tests and shared-library builds |

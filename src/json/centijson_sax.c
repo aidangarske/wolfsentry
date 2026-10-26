@@ -1185,6 +1185,7 @@ json_number_to_uint64(const unsigned char* num, size_t num_size)
     return val;
 }
 
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API int
 json_number_to_double(const unsigned char* num, size_t num_size, double* p_result)
 {
@@ -1258,6 +1259,7 @@ json_number_to_double(const unsigned char* num, size_t num_size, double* p_resul
 #endif
     return 0;
 }
+#endif
 
 
 WOLFSENTRY_API int
@@ -1312,6 +1314,7 @@ json_dump_uint64(uint64_t u64, JSON_DUMP_CALLBACK write_func, void* user_data)
     return write_func((const unsigned char *)buffer + off, sizeof(buffer) - off, user_data);
 }
 
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API int
 json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
@@ -1421,6 +1424,7 @@ json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
 #endif
     return ret;
 }
+#endif
 
 static void
 json_control_to_hex(char* buf, uint8_t ch)

@@ -312,6 +312,10 @@ ifdef NO_CONFIG_ERROR_MESSAGES
     CFLAGS += -DWOLFSENTRY_CONFIG_NO_ERROR_MESSAGES
 endif
 
+ifdef NO_DOUBLE
+    CFLAGS += -DWOLFSENTRY_NO_DOUBLE
+endif
+
 ifdef CALL_TRACE
     CFLAGS += -DWOLFSENTRY_DEBUG_CALL_TRACE -fno-omit-frame-pointer -Wno-inline
 endif

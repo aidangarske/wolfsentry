@@ -261,6 +261,11 @@ json_value_is_compatible(const JSON_VALUE* v, JSON_VALUE_TYPE type)
     if(json_value_type(v) == type)
         return 1;
 
+#ifdef WOLFSENTRY_NO_DOUBLE
+    if(type == JSON_VALUE_FLOAT || type == JSON_VALUE_DOUBLE)
+        return 0;
+#endif
+
     /* We say any numeric json_value is compatible with another numeric json_value as
      * long as the conversion does not loose much information. */
     switch(json_value_type(v)) {
@@ -285,6 +290,7 @@ json_value_is_compatible(const JSON_VALUE* v, JSON_VALUE_TYPE type)
                    (type == JSON_VALUE_UINT32 && json_value_uint64(v) <= UINT32_MAX)  ||
                    (type == JSON_VALUE_INT64 && json_value_uint64(v) <= INT64_MAX);
 
+#ifndef WOLFSENTRY_NO_DOUBLE
         case JSON_VALUE_FLOAT:
             return (type == JSON_VALUE_DOUBLE)  ||
                    (type == JSON_VALUE_INT32 && json_value_float(v) == (float)json_value_int32(v))  ||
@@ -298,6 +304,7 @@ json_value_is_compatible(const JSON_VALUE* v, JSON_VALUE_TYPE type)
                    (type == JSON_VALUE_UINT32 && json_value_double(v) == (double)json_value_uint32(v))  ||
                    (type == JSON_VALUE_INT64 && json_value_double(v) == (double)json_value_int64(v))  ||
                    (type == JSON_VALUE_UINT64 && json_value_double(v) == (double)json_value_uint64(v));
+#endif
 
         default:
             break;
@@ -451,6 +458,7 @@ json_value_init_uint64(
         v, JSON_VALUE_UINT64, &u64, sizeof(uint64_t));
 }
 
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API int
 json_value_init_float(
 #ifdef WOLFSENTRY
@@ -484,6 +492,7 @@ json_value_init_double(
 #endif
         v, JSON_VALUE_DOUBLE, &d, sizeof(double));
 }
+#endif
 
 WOLFSENTRY_API int
 json_value_init_string_(
@@ -693,8 +702,10 @@ json_value_int32(const JSON_VALUE* v)
         case JSON_VALUE_UINT32:    memcpy(&ret.u32, payload, sizeof(uint32_t)); return (int32_t) ret.u32;
         case JSON_VALUE_INT64:     memcpy(&ret.i64, payload, sizeof(int64_t)); return (int32_t) ret.i64;
         case JSON_VALUE_UINT64:    memcpy(&ret.u64, payload, sizeof(uint64_t)); return (int32_t) ret.u64;
+#ifndef WOLFSENTRY_NO_DOUBLE
         case JSON_VALUE_FLOAT:     memcpy(&ret.f, payload, sizeof(float)); return ROUNDF(int32_t, ret.f);
         case JSON_VALUE_DOUBLE:    memcpy(&ret.d, payload, sizeof(double)); return ROUNDD(int32_t, ret.d);
+#endif
         default:            return -1;
     }
 }
@@ -717,8 +728,10 @@ json_value_uint32(const JSON_VALUE* v)
         case JSON_VALUE_UINT32:    memcpy(&ret.u32, payload, sizeof(uint32_t)); return ret.u32;
         case JSON_VALUE_INT64:     memcpy(&ret.i64, payload, sizeof(int64_t)); return (uint32_t) ret.i64;
         case JSON_VALUE_UINT64:    memcpy(&ret.u64, payload, sizeof(uint64_t)); return (uint32_t) ret.u64;
+#ifndef WOLFSENTRY_NO_DOUBLE
         case JSON_VALUE_FLOAT:     memcpy(&ret.f, payload, sizeof(float)); return ROUNDF(uint32_t, ret.f);
         case JSON_VALUE_DOUBLE:    memcpy(&ret.d, payload, sizeof(double)); return ROUNDD(uint32_t, ret.d);
+#endif
         default:            return UINT32_MAX;
     }
 }
@@ -741,8 +754,10 @@ json_value_int64(const JSON_VALUE* v)
         case JSON_VALUE_UINT32:    memcpy(&ret.u32, payload, sizeof(uint32_t)); return (int64_t) ret.u32;
         case JSON_VALUE_INT64:     memcpy(&ret.i64, payload, sizeof(int64_t)); return ret.i64;
         case JSON_VALUE_UINT64:    memcpy(&ret.u64, payload, sizeof(uint64_t)); return (int64_t) ret.u64;
+#ifndef WOLFSENTRY_NO_DOUBLE
         case JSON_VALUE_FLOAT:     memcpy(&ret.f, payload, sizeof(float)); return ROUNDF(int64_t, ret.f);
         case JSON_VALUE_DOUBLE:    memcpy(&ret.d, payload, sizeof(double)); return ROUNDD(int64_t, ret.d);
+#endif
         default:            return -1;
     }
 }
@@ -765,12 +780,15 @@ json_value_uint64(const JSON_VALUE* v)
         case JSON_VALUE_UINT32:    memcpy(&ret.u32, payload, sizeof(uint32_t)); return (uint64_t) ret.u32;
         case JSON_VALUE_INT64:     memcpy(&ret.i64, payload, sizeof(int64_t)); return (uint64_t) ret.i64;
         case JSON_VALUE_UINT64:    memcpy(&ret.u64, payload, sizeof(uint64_t)); return ret.u64;
+#ifndef WOLFSENTRY_NO_DOUBLE
         case JSON_VALUE_FLOAT:     memcpy(&ret.f, payload, sizeof(float)); return ROUNDF(uint64_t, ret.f);
         case JSON_VALUE_DOUBLE:    memcpy(&ret.d, payload, sizeof(double)); return ROUNDD(uint64_t, ret.d);
+#endif
         default:            return UINT64_MAX;
     }
 }
 
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API float
 json_value_float(const JSON_VALUE* v)
 {
@@ -818,6 +836,7 @@ json_value_double(const JSON_VALUE* v)
         default:            return -1.0;    /* FIXME: NaN would be likely better but we do not include <math.h> */
     }
 }
+#endif
 
 WOLFSENTRY_API const unsigned char*
 json_value_string(const JSON_VALUE* v)
@@ -1860,11 +1879,17 @@ json_value_clone(WOLFSENTRY_CONTEXT_ARGS_IN_EX(struct wolfsentry_allocator *allo
             break;
 
         case JSON_VALUE_FLOAT:
+#ifndef WOLFSENTRY_NO_DOUBLE
             ret = json_value_init_float(WOLFSENTRY_CONTEXT_ARGS_OUT_EX(allocator), clone, json_value_float(node));
             break;
+#endif
 
         case JSON_VALUE_DOUBLE:
+#ifdef WOLFSENTRY_NO_DOUBLE
+            ret = -1;
+#else
             ret = json_value_init_double(WOLFSENTRY_CONTEXT_ARGS_OUT_EX(allocator), clone, json_value_double(node));
+#endif
             break;
 
         case JSON_VALUE_STRING:

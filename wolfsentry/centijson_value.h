@@ -260,6 +260,7 @@ WOLFSENTRY_API int json_value_init_uint64(
     WOLFSENTRY_CONTEXT_ARGS_IN_EX(struct wolfsentry_allocator *allocator),
 #endif
     JSON_VALUE* v, uint64_t u64);
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API int json_value_init_float(
 #ifdef WOLFSENTRY
     WOLFSENTRY_CONTEXT_ARGS_IN_EX(struct wolfsentry_allocator *allocator),
@@ -270,6 +271,7 @@ WOLFSENTRY_API int json_value_init_double(
     WOLFSENTRY_CONTEXT_ARGS_IN_EX(struct wolfsentry_allocator *allocator),
 #endif
     JSON_VALUE* v, double d);
+#endif
 
 /* Getters.
  *
@@ -284,8 +286,10 @@ WOLFSENTRY_API int32_t json_value_int32(const JSON_VALUE* v);
 WOLFSENTRY_API uint32_t json_value_uint32(const JSON_VALUE* v);
 WOLFSENTRY_API int64_t json_value_int64(const JSON_VALUE* v);
 WOLFSENTRY_API uint64_t json_value_uint64(const JSON_VALUE* v);
+#ifndef WOLFSENTRY_NO_DOUBLE
 WOLFSENTRY_API float json_value_float(const JSON_VALUE* v);
 WOLFSENTRY_API double json_value_double(const JSON_VALUE* v);
+#endif
 
 
 /********************

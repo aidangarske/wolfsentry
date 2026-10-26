@@ -128,6 +128,9 @@ init_number(
 #endif
             v, json_number_to_uint64(data, data_size));
     } else {
+#ifdef WOLFSENTRY_NO_DOUBLE
+        return JSON_ERR_SYNTAX;
+#else
         double d;
         int err;
         err = json_number_to_double(data, data_size, &d);
@@ -138,6 +141,7 @@ init_number(
             WOLFSENTRY_CONTEXT_ARGS_OUT_EX(allocator),
 #endif
             v, d);
+#endif
     }
 }
 
@@ -258,6 +262,10 @@ json_dom_process(JSON_TYPE type, const unsigned char* data, size_t data_size, vo
         default:                return JSON_ERR_INTERNAL;
     }
 
+#ifdef WOLFSENTRY_NO_DOUBLE
+    if(ret == JSON_ERR_SYNTAX)
+        return ret;
+#endif
     if(ret < 0)
         return JSON_ERR_OUTOFMEMORY;
 
@@ -543,8 +551,12 @@ json_dom_dump_helper(
 
         case JSON_VALUE_FLOAT:
         case JSON_VALUE_DOUBLE:
+#ifdef WOLFSENTRY_NO_DOUBLE
+            ret = JSON_ERR_INTERNAL;
+#else
             ret = json_dump_double(json_value_double(node),
                             params->write_func, params->user_data);
+#endif
             break;
 
         case JSON_VALUE_STRING:

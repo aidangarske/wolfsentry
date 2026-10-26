@@ -65,6 +65,8 @@ jobs:
             target: no-addr-bitmask-matching-test
           - name: No IPv6
             target: no-ipv6-test
+          - name: No double
+            target: no-double-test
           - name: C99
             target: c99-test
           - name: No alloca
@@ -181,6 +183,7 @@ jobs:
           - no-protocol-names
           - no-text-numbers
           - no-text-addresses
+          - no-double
           - minimal
           - minimal-no-json
           - reduced
