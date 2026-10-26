@@ -768,6 +768,26 @@ static const struct wolfsentry_allocator default_allocator = {
 
 #endif /* WOLFSENTRY_MALLOC_BUILTINS */
 
+#if defined(WOLFSENTRY_CLOCK_BUILTINS) || (defined(FREERTOS) && defined(WOLFSENTRY_THREADSAFE))
+/* divisor must be 1-65535; 32-bit steps avoid the libgcc 64-bit divide */
+static uint64_t wolfsentry_div64_by_u16(uint64_t dividend, uint32_t divisor, uint32_t *remainder)
+{
+    uint64_t quotient = 0U;
+    uint32_t rem = 0U;
+    uint32_t cur;
+    int shift;
+
+    for (shift = 48; shift >= 0; shift -= 16) {
+        cur = (rem << 16U) | (uint32_t)((dividend >> shift) & 0xffffU);
+        quotient = (quotient << 16U) | (uint64_t)(cur / divisor);
+        rem = cur % divisor;
+    }
+    if (remainder != NULL)
+        *remainder = rem;
+    return quotient;
+}
+#endif
+
 #if defined(FREERTOS) && (defined(WOLFSENTRY_THREADSAFE) || defined(WOLFSENTRY_CLOCK_BUILTINS))
 
 #include <task.h>
@@ -780,8 +800,15 @@ static void freertos_now(struct timespec *now) {
     ullTickCount = (uint64_t)(xCurrentTime.xOverflowCount) << (sizeof(TickType_t) * 8);
     ullTickCount += xCurrentTime.xTimeOnEntering;
 
-    now->tv_sec = (time_t)(ullTickCount / configTICK_RATE_HZ);
-    now->tv_nsec = (long int)(((ullTickCount % configTICK_RATE_HZ) * FREERTOS_NANOSECONDS_PER_SECOND) / configTICK_RATE_HZ);
+    if (configTICK_RATE_HZ < 65536U) {
+        uint32_t ticks_rem;
+        now->tv_sec = (time_t)wolfsentry_div64_by_u16(ullTickCount, (uint32_t)configTICK_RATE_HZ, &ticks_rem);
+        now->tv_nsec = (long int)wolfsentry_div64_by_u16((uint64_t)ticks_rem * (uint64_t)FREERTOS_NANOSECONDS_PER_SECOND, (uint32_t)configTICK_RATE_HZ, NULL);
+    }
+    else {
+        now->tv_sec = (time_t)(ullTickCount / configTICK_RATE_HZ);
+        now->tv_nsec = (long int)(((ullTickCount % configTICK_RATE_HZ) * FREERTOS_NANOSECONDS_PER_SECOND) / configTICK_RATE_HZ);
+    }
 }
 
 #endif /* FREERTOS && (WOLFSENTRY_THREADSAFE || WOLFSENTRY_CLOCK_BUILTINS) */
@@ -3381,7 +3408,7 @@ static wolfsentry_errcode_t wolfsentry_builtin_get_time(void *context, wolfsentr
     struct timespec ts;
     (void)context;
     freertos_now(&ts);
-    *now = ((wolfsentry_time_t)ts.tv_sec * (wolfsentry_time_t)1000000) + ((wolfsentry_time_t)ts.tv_nsec / (wolfsentry_time_t)1000);
+    *now = ((wolfsentry_time_t)ts.tv_sec * (wolfsentry_time_t)1000000) + (wolfsentry_time_t)(ts.tv_nsec / 1000L);
     WOLFSENTRY_RETURN_OK;
 }
 
@@ -3394,7 +3421,7 @@ static wolfsentry_errcode_t wolfsentry_builtin_get_time(void *context, wolfsentr
     tick_count = tx_time_get();
     ts.tv_sec = (long)tick_count / TX_TICK_TIME_MS;
     ts.tv_nsec = (long)(tick_count % TX_TICK_TIME_MS) * 1000000;
-    *now = ((wolfsentry_time_t)ts.tv_sec * (wolfsentry_time_t)1000000) + ((wolfsentry_time_t)ts.tv_nsec / (wolfsentry_time_t)1000);
+    *now = ((wolfsentry_time_t)ts.tv_sec * (wolfsentry_time_t)1000000) + (wolfsentry_time_t)(ts.tv_nsec / 1000L);
     WOLFSENTRY_RETURN_OK;
 }
 
@@ -3407,7 +3434,7 @@ static wolfsentry_errcode_t wolfsentry_builtin_get_time(void *context, wolfsentr
     (void)context;
     if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
         WOLFSENTRY_ERROR_RETURN(SYS_OP_FATAL);
-    *now = ((wolfsentry_time_t)ts.tv_sec * (wolfsentry_time_t)1000000) + ((wolfsentry_time_t)ts.tv_nsec / (wolfsentry_time_t)1000);
+    *now = ((wolfsentry_time_t)ts.tv_sec * (wolfsentry_time_t)1000000) + (wolfsentry_time_t)(ts.tv_nsec / 1000L);
     WOLFSENTRY_RETURN_OK;
 }
 
@@ -3422,17 +3449,31 @@ static wolfsentry_time_t wolfsentry_builtin_add_time(wolfsentry_time_t start_tim
 }
 
 static wolfsentry_errcode_t wolfsentry_builtin_to_epoch_time(wolfsentry_time_t when, time_t *epoch_secs, long *epoch_nsecs) {
-    if (when / (wolfsentry_time_t)1000000 > MAX_SINT_OF(*epoch_secs))
+    uint64_t magnitude;
+    uint64_t secs;
+    uint32_t usecs;
+
+    magnitude = (when < 0) ? ((uint64_t)0U - (uint64_t)when) : (uint64_t)when;
+    /* 1000000 is 15625 << 6 */
+    secs = wolfsentry_div64_by_u16(magnitude >> 6U, 15625U, &usecs);
+    usecs = (usecs << 6U) | (uint32_t)(magnitude & 0x3fU);
+    if (secs > (uint64_t)MAX_SINT_OF(*epoch_secs) + ((when < 0) ? 1U : 0U))
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    *epoch_secs = (time_t)(when / (wolfsentry_time_t)1000000);
-    *epoch_nsecs = (long)((when % (wolfsentry_time_t)1000000) * (wolfsentry_time_t)1000);
+    if (when < 0) {
+        *epoch_secs = (time_t)(-(int64_t)secs);
+        *epoch_nsecs = -((long)usecs * 1000L);
+    }
+    else {
+        *epoch_secs = (time_t)secs;
+        *epoch_nsecs = (long)usecs * 1000L;
+    }
     WOLFSENTRY_RETURN_OK;
 }
 
 static wolfsentry_errcode_t wolfsentry_builtin_from_epoch_time(time_t epoch_secs, long epoch_nsecs, wolfsentry_time_t *when) {
     if ((wolfsentry_time_t)epoch_secs > MAX_SINT_OF(*when) / (wolfsentry_time_t)1000000)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    *when = ((wolfsentry_time_t)epoch_secs * (wolfsentry_time_t)1000000) + ((wolfsentry_time_t)epoch_nsecs / (wolfsentry_time_t)1000);
+    *when = ((wolfsentry_time_t)epoch_secs * (wolfsentry_time_t)1000000) + (wolfsentry_time_t)(epoch_nsecs / 1000L);
     WOLFSENTRY_RETURN_OK;
 }
 

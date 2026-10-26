@@ -214,6 +214,61 @@ static const struct wolfsentry_host_platform_interface vanilla_posix_hpi = {
 
 #ifdef TEST_INIT
 
+static int test_epoch_conversion(struct wolfsentry_context *wolfsentry, wolfsentry_time_t when)
+{
+    wolfsentry_time_t native_secs = when / 1000000;
+    long native_nsecs = (long)(when % 1000000) * 1000L;
+    wolfsentry_time_t round_trip = 0;
+    time_t secs = 0;
+    long nsecs = 0;
+    wolfsentry_errcode_t ret;
+
+    ret = wolfsentry_to_epoch_time(wolfsentry, when, &secs, &nsecs);
+    if ((native_secs > MAX_SINT_OF(secs)) || (native_secs < MIN_SINT_OF(secs))) {
+        WOLFSENTRY_EXIT_ON_FALSE(WOLFSENTRY_ERROR_CODE_IS(ret, NUMERIC_ARG_TOO_BIG));
+        return 0;
+    }
+    WOLFSENTRY_EXIT_ON_FAILURE(ret);
+    WOLFSENTRY_EXIT_ON_FALSE((wolfsentry_time_t)secs == native_secs);
+    WOLFSENTRY_EXIT_ON_FALSE(nsecs == native_nsecs);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_from_epoch_time(wolfsentry, secs, nsecs, &round_trip));
+    WOLFSENTRY_EXIT_ON_FALSE(round_trip == when);
+    return 0;
+}
+
+static int test_time_division(struct wolfsentry_context *wolfsentry)
+{
+    static const wolfsentry_time_t edge_times[] = {
+        0, 1, -1, 999999, -999999, 1000000, -1000000, 1000001, -1000001,
+        MAX_SINT_OF(int64_t), MIN_SINT_OF(int64_t)
+    };
+    uint64_t value = ((uint64_t)0x9e3779b9U << 32U) | (uint64_t)0x7f4a7c15U;
+    wolfsentry_time_t when;
+    time_t epoch_secs = 0;
+    size_t i;
+
+    for (i = 0U; i < sizeof edge_times / sizeof edge_times[0]; ++i)
+        WOLFSENTRY_EXIT_ON_FALSE(test_epoch_conversion(wolfsentry, edge_times[i]) == 0);
+
+    /* the most negative representable second is valid on 32-bit time_t */
+    when = (wolfsentry_time_t)((uint64_t)MIN_SINT_OF(epoch_secs) * 1000000U);
+    if ((when / 1000000) == (wolfsentry_time_t)MIN_SINT_OF(epoch_secs)) {
+        WOLFSENTRY_EXIT_ON_FALSE(test_epoch_conversion(wolfsentry, when) == 0);
+        WOLFSENTRY_EXIT_ON_FALSE(test_epoch_conversion(wolfsentry, when - 1000000) == 0);
+    }
+
+    for (i = 0U; i < 2000U; ++i) {
+        value ^= value << 13U;
+        value ^= value >> 7U;
+        value ^= value << 17U;
+        when = (wolfsentry_time_t)(value >> (1U + (i % 40U)));
+        if (i & 1U)
+            when = -when;
+        WOLFSENTRY_EXIT_ON_FALSE(test_epoch_conversion(wolfsentry, when) == 0);
+    }
+    return 0;
+}
+
 static wolfsentry_errcode_t test_init(void) {
     struct wolfsentry_context *wolfsentry;
 #ifdef WOLFSENTRY_HAVE_DESIGNATED_INITIALIZERS
@@ -263,6 +318,8 @@ static wolfsentry_errcode_t test_init(void) {
     printf("wolfsentry_init() returns " WOLFSENTRY_ERROR_FMT "\n", WOLFSENTRY_ERROR_FMT_ARGS(ret));
     if (ret < 0)
         WOLFSENTRY_ERROR_RERETURN(ret);
+
+    WOLFSENTRY_EXIT_ON_FALSE(test_time_division(wolfsentry) == 0);
 
     ret = wolfsentry_shutdown(WOLFSENTRY_CONTEXT_ARGS_OUT_EX(&wolfsentry));
     printf("wolfsentry_shutdown() returns " WOLFSENTRY_ERROR_FMT "\n", WOLFSENTRY_ERROR_FMT_ARGS(ret));
