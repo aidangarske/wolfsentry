@@ -5612,6 +5612,154 @@ static int test_cbor(void)
 #include <wolfsentry/centijson_dom.h>
 #endif
 
+#if !defined(WOLFSENTRY_CONFIG_NO_USER_VALUES) && \
+    !defined(WOLFSENTRY_CONFIG_NO_EVENTCONFIG)
+static int test_json_integer_text(void) {
+    static const struct {
+        const char *key;
+        const char *text;
+        int expect_ok;
+        long value;
+    } cases[] = {
+        { "uint", "0", 1, 0L },
+        { "uint", "42", 1, 42L },
+        { "uint", "0x2A", 1, 42L },
+        { "uint", "0X2a", 1, 42L },
+        { "uint", "052", 1, 42L },
+        { "uint", "+7", 1, 7L },
+        { "uint", " 9", 1, 9L },
+        { "uint", "0x", 0, 0L },
+        { "uint", "08", 0, 0L },
+        { "uint", "12a", 0, 0L },
+        { "uint", "abc", 0, 0L },
+        { "uint", "18446744073709551616", 0, 0L },
+        { "uint", "-1", 0, 0L },
+        { "uint", "", 0, 0L },
+        { "sint", "-42", 1, -42L },
+        { "sint", "-0x2a", 1, -42L },
+        { "sint", "-052", 1, -42L },
+        { "sint", "9223372036854775808", 0, 0L },
+        { "sint", "-9223372036854775809", 0, 0L },
+        { "max-connection-count", "0x10", 1, 16L },
+        { "max-connection-count", "4294967295", 1, -1L },
+        { "penalty-box-duration", "90", 1, 90L },
+        { "penalty-box-duration", "2m", 1, 120L },
+        { "penalty-box-duration", "1h", 1, 3600L },
+        { "penalty-box-duration", "1d", 1, 86400L },
+        { "penalty-box-duration", "0x10s", 1, 16L },
+        { "penalty-box-duration", "5x", 0, 0L },
+        { "penalty-box-duration", "m", 0, 0L }
+    };
+    struct wolfsentry_context *wolfsentry = NULL;
+    struct wolfsentry_eventconfig config;
+    wolfsentry_config_load_flags_t load_flags;
+    char config_text[160];
+    char key[8];
+    uint64_t uint_value;
+    int64_t sint_value;
+    wolfsentry_time_t duration;
+    wolfsentry_errcode_t ret;
+    size_t i;
+    WOLFSENTRY_THREAD_HEADER_CHECKED(WOLFSENTRY_THREAD_FLAG_NONE);
+
+#ifdef WOLFSENTRY_CONFIG_NO_TRANSACTIONS
+    load_flags = WOLFSENTRY_CONFIG_LOAD_FLAG_NONE;
+#else
+    load_flags = WOLFSENTRY_CONFIG_LOAD_FLAG_LOAD_THEN_COMMIT;
+#endif
+    memset(&config, 0, sizeof config);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_init(
+        wolfsentry_build_settings,
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(WOLFSENTRY_TEST_HPI),
+        &config,
+        &wolfsentry));
+
+    for (i = 0U; i < sizeof cases / sizeof cases[0]; ++i) {
+        (void)snprintf(key, sizeof key, "v%u", (unsigned int)i);
+        if (cases[i].key[0] == 'u' || cases[i].key[0] == 's') {
+            (void)snprintf(config_text, sizeof config_text,
+                "{\"wolfsentry-config-version\":1,\"user-values\":"
+                "{\"%s\":{\"%s\":\"%s\"}}}", key, cases[i].key, cases[i].text);
+        }
+        else {
+            (void)snprintf(config_text, sizeof config_text,
+                "{\"wolfsentry-config-version\":1,\"config-update\":"
+                "{\"%s\":\"%s\"}}", cases[i].key, cases[i].text);
+        }
+        ret = wolfsentry_config_json_oneshot(
+            WOLFSENTRY_CONTEXT_ARGS_OUT,
+            (const unsigned char *)config_text,
+            strlen(config_text),
+            WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | load_flags,
+            NULL,
+            0U);
+        if (! cases[i].expect_ok) {
+            if (ret >= 0)
+                printf("integer text case %u (%s) unexpectedly loaded\n", (unsigned int)i, cases[i].text);
+            WOLFSENTRY_EXIT_ON_FALSE(ret < 0);
+            continue;
+        }
+        WOLFSENTRY_EXIT_ON_FAILURE(ret);
+        if (cases[i].key[0] == 'u') {
+            WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_uint(
+                WOLFSENTRY_CONTEXT_ARGS_OUT, key,
+                WOLFSENTRY_LENGTH_NULL_TERMINATED, &uint_value));
+            WOLFSENTRY_EXIT_ON_FALSE(uint_value == (uint64_t)cases[i].value);
+        }
+        else if (cases[i].key[0] == 's') {
+            WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+                WOLFSENTRY_CONTEXT_ARGS_OUT, key,
+                WOLFSENTRY_LENGTH_NULL_TERMINATED, &sint_value));
+            WOLFSENTRY_EXIT_ON_FALSE(sint_value == (int64_t)cases[i].value);
+        }
+        else {
+            WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_defaultconfig_get(
+                WOLFSENTRY_CONTEXT_ARGS_OUT, &config));
+            if (cases[i].key[0] == 'm') {
+                WOLFSENTRY_EXIT_ON_FALSE(config.max_connection_count == (uint32_t)cases[i].value);
+            }
+            else {
+                WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_interval_from_seconds(
+                    wolfsentry, cases[i].value, 0, &duration));
+                WOLFSENTRY_EXIT_ON_FALSE(config.penaltybox_duration == duration);
+            }
+        }
+    }
+
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_config_json_oneshot(
+        WOLFSENTRY_CONTEXT_ARGS_OUT,
+        (const unsigned char *)"{\"wolfsentry-config-version\":1,\"user-values\":"
+        "{\"umax\":{\"uint\":\"18446744073709551615\"},"
+        "\"smax\":{\"sint\":\"9223372036854775807\"},"
+        "\"smin\":{\"sint\":\"-9223372036854775808\"}}}",
+        strlen("{\"wolfsentry-config-version\":1,\"user-values\":"
+        "{\"umax\":{\"uint\":\"18446744073709551615\"},"
+        "\"smax\":{\"sint\":\"9223372036854775807\"},"
+        "\"smin\":{\"sint\":\"-9223372036854775808\"}}}"),
+        WOLFSENTRY_CONFIG_LOAD_FLAG_NO_FLUSH | load_flags,
+        NULL,
+        0U));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_uint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT, "umax",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED, &uint_value));
+    WOLFSENTRY_EXIT_ON_FALSE(uint_value == ~(uint64_t)0U);
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT, "smax",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED, &sint_value));
+    WOLFSENTRY_EXIT_ON_FALSE(sint_value == MAX_SINT_OF(int64_t));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_user_value_get_sint(
+        WOLFSENTRY_CONTEXT_ARGS_OUT, "smin",
+        WOLFSENTRY_LENGTH_NULL_TERMINATED, &sint_value));
+    WOLFSENTRY_EXIT_ON_FALSE(sint_value == MIN_SINT_OF(int64_t));
+
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_shutdown(
+        WOLFSENTRY_CONTEXT_ARGS_OUT_EX(&wolfsentry)));
+    WOLFSENTRY_EXIT_ON_FAILURE(WOLFSENTRY_THREAD_TAILER(
+        WOLFSENTRY_THREAD_FLAG_NONE));
+    return 0;
+}
+#endif
+
 #ifdef WOLFSENTRY_NO_DOUBLE
 static int test_json(const char *fname, const char *extra_fname) {
     static const unsigned char valid_config[] =
@@ -7400,6 +7548,13 @@ int main(int argc, char* argv[]) {
         (void)fprintf(stderr, "test_json failed for " TEST_NUMERIC_JSON_CONFIG_PATH ", " WOLFSENTRY_ERROR_FMT "\n", WOLFSENTRY_ERROR_FMT_ARGS(ret));
         err = 1;
     }
+#if !defined(WOLFSENTRY_CONFIG_NO_USER_VALUES) && \
+    !defined(WOLFSENTRY_CONFIG_NO_EVENTCONFIG)
+    if (test_json_integer_text() != 0) {
+        (void)fprintf(stderr, "test_json_integer_text failed\n");
+        err = 1;
+    }
+#endif
 #endif
 
 #ifdef TEST_JSON_CORPUS

@@ -260,6 +260,137 @@ static wolfsentry_errcode_t reset_o_u_c(struct wolfsentry_json_process_state *jp
     WOLFSENTRY_RETURN_OK;
 }
 
+#ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
+static unsigned int text_digit_value(unsigned char c)
+{
+    if ((c >= '0') && (c <= '9'))
+        return (unsigned int)(c - '0');
+    c = (unsigned char)(c | 0x20U);
+    if ((c >= 'a') && (c <= 'f'))
+        return (unsigned int)(c - 'a') + 10U;
+    return 16U;
+}
+
+/* Parses the integer prefix that strtol() accepts with base 0, rejecting an
+ * empty number or 64-bit overflow. */
+static wolfsentry_errcode_t parse_text_integer(
+    const unsigned char *data,
+    size_t data_size,
+    size_t *consumed,
+    int *negative,
+    uint64_t *magnitude)
+{
+    size_t i = 0U;
+    size_t digits_start;
+    uint64_t value = 0U;
+    uint64_t cutoff;
+    unsigned int cutlim;
+    unsigned int base = 10U;
+    unsigned int digit;
+
+    while ((i < data_size) &&
+           ((data[i] == ' ') || ((data[i] >= '\t') && (data[i] <= '\r'))))
+    {
+        ++i;
+    }
+    *negative = 0;
+    if ((i < data_size) && ((data[i] == '+') || (data[i] == '-'))) {
+        *negative = (data[i] == '-');
+        ++i;
+    }
+    if ((i < data_size) && (data[i] == '0')) {
+        base = 8U;
+        if ((i + 2U < data_size) &&
+            ((data[i + 1U] | 0x20U) == 'x') &&
+            (text_digit_value(data[i + 2U]) < 16U))
+        {
+            base = 16U;
+            i += 2U;
+        }
+    }
+    if (base == 16U) {
+        cutoff = MAX_UINT_OF(uint64_t) >> 4U;
+        cutlim = 15U;
+    }
+    else if (base == 8U) {
+        cutoff = MAX_UINT_OF(uint64_t) >> 3U;
+        cutlim = 7U;
+    }
+    else {
+        cutoff = MAX_UINT_OF(uint64_t) / 10U;
+        cutlim = (unsigned int)(MAX_UINT_OF(uint64_t) % 10U);
+    }
+
+    digits_start = i;
+    while (i < data_size) {
+        digit = text_digit_value(data[i]);
+        if (digit >= base)
+            break;
+        if ((value > cutoff) || ((value == cutoff) && (digit > cutlim)))
+            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+        value = (value * base) + digit;
+        ++i;
+    }
+    if (i == digits_start)
+        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+
+    *consumed = i;
+    *magnitude = value;
+    WOLFSENTRY_RETURN_OK;
+}
+
+static wolfsentry_errcode_t parse_text_uint(
+    const unsigned char *data,
+    size_t data_size,
+    uint64_t max_value,
+    uint64_t *out)
+{
+    size_t consumed;
+    int negative;
+    uint64_t magnitude;
+    wolfsentry_errcode_t ret;
+
+    ret = parse_text_integer(data, data_size, &consumed, &negative, &magnitude);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
+    if ((consumed != data_size) || (negative && (magnitude != 0U)))
+        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+    if (magnitude > max_value)
+        WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
+    *out = magnitude;
+    WOLFSENTRY_RETURN_OK;
+}
+
+#if !defined(WOLFSENTRY_CONFIG_NO_USER_VALUES) || \
+    !defined(WOLFSENTRY_CONFIG_NO_EVENTCONFIG)
+static wolfsentry_errcode_t parse_text_sint(
+    const unsigned char *data,
+    size_t data_size,
+    size_t *consumed,
+    int64_t min_value,
+    int64_t max_value,
+    int64_t *out)
+{
+    int negative;
+    uint64_t magnitude;
+    wolfsentry_errcode_t ret;
+
+    ret = parse_text_integer(data, data_size, consumed, &negative, &magnitude);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
+    if (negative) {
+        if (magnitude > (uint64_t)0U - (uint64_t)min_value)
+            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+        *out = (magnitude == 0U) ? 0 : (-(int64_t)(magnitude - 1U) - 1);
+    }
+    else {
+        if (magnitude > (uint64_t)max_value)
+            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+        *out = (int64_t)magnitude;
+    }
+    WOLFSENTRY_RETURN_OK;
+}
+#endif
+#endif /* !WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS */
+
 #ifndef WOLFSENTRY_CONFIG_NO_USER_VALUES
 
 static wolfsentry_errcode_t convert_uint64(
@@ -268,15 +399,6 @@ static wolfsentry_errcode_t convert_uint64(
     size_t data_size,
     uint64_t *out)
 {
-#ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
-    char buf[24];
-    char *endptr;
-#ifdef WOLFSENTRY_HAVE_LONG_LONG
-    unsigned long long conv;
-#else
-    unsigned long conv;
-#endif
-#endif
 #ifdef WOLFSENTRY_WOLFCOSE
     const struct config_number *number =
         get_config_number(type, data, data_size);
@@ -295,27 +417,9 @@ static wolfsentry_errcode_t convert_uint64(
     if ((type != JSON_NUMBER) && (type != JSON_STRING))
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 
-    if (data_size >= sizeof buf)
+    if (data_size >= 24U)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    memcpy(buf, data, data_size);
-    buf[data_size] = 0;
-
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    errno = 0;
-#endif
-#ifdef WOLFSENTRY_HAVE_LONG_LONG
-    conv = strtoull(buf, &endptr, 0);
-#else
-    conv = strtoul(buf, &endptr, 0);
-#endif
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    if (errno != 0)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-
-    if ((size_t)(endptr - buf) != data_size)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-    *out = (uint64_t)conv;
+    WOLFSENTRY_ERROR_RERETURN(parse_text_uint(data, data_size, MAX_UINT_OF(uint64_t), out));
 #endif
 
     WOLFSENTRY_RETURN_OK;
@@ -328,13 +432,8 @@ static wolfsentry_errcode_t convert_sint64(
     int64_t *out)
 {
 #ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
-    char buf[24];
-    char *endptr;
-#ifdef WOLFSENTRY_HAVE_LONG_LONG
-    long long conv;
-#else
-    long conv;
-#endif
+    size_t consumed;
+    wolfsentry_errcode_t ret;
 #endif
 #ifdef WOLFSENTRY_WOLFCOSE
     const struct config_number *number =
@@ -362,27 +461,12 @@ static wolfsentry_errcode_t convert_sint64(
     if ((type != JSON_NUMBER) && (type != JSON_STRING))
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 
-    if (data_size >= sizeof buf)
+    if (data_size >= 24U)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    memcpy(buf, data, data_size);
-    buf[data_size] = 0;
-
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    errno = 0;
-#endif
-#ifdef WOLFSENTRY_HAVE_LONG_LONG
-    conv = strtoll(buf, &endptr, 0);
-#else
-    conv = strtol(buf, &endptr, 0);
-#endif
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    if (errno != 0)
+    ret = parse_text_sint(data, data_size, &consumed, MIN_SINT_OF(int64_t), MAX_SINT_OF(int64_t), out);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
+    if (consumed != data_size)
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-
-    if ((size_t)(endptr - buf) != data_size)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-    *out = (int64_t)conv;
 #endif
 
     WOLFSENTRY_RETURN_OK;
@@ -397,9 +481,8 @@ static wolfsentry_errcode_t convert_uint32(
     uint32_t *out)
 {
 #ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
-    char buf[16];
-    char *endptr;
-    unsigned long conv;
+    uint64_t conv;
+    wolfsentry_errcode_t ret;
 #endif
 #ifdef WOLFSENTRY_WOLFCOSE
     const struct config_number *number =
@@ -421,24 +504,10 @@ static wolfsentry_errcode_t convert_uint32(
     if ((type != JSON_NUMBER) && (type != JSON_STRING))
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 
-    if (data_size >= sizeof buf)
+    if (data_size >= 16U)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    memcpy(buf, data, data_size);
-    buf[data_size] = 0;
-
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    errno = 0;
-#endif
-    conv = strtoul(buf, &endptr, 0);
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    if (errno != 0)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-
-    if ((size_t)(endptr - buf) != data_size)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-    if (conv > MAX_UINT_OF(*out))
-        WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
+    ret = parse_text_uint(data, data_size, MAX_UINT_OF(*out), &conv);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
     *out = (uint32_t)conv;
 #endif
 
@@ -455,9 +524,8 @@ static wolfsentry_errcode_t convert_uint16(
     uint16_t *out)
 {
 #ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
-    char buf[8];
-    char *endptr;
-    unsigned long conv;
+    uint64_t conv;
+    wolfsentry_errcode_t ret;
 #endif
 #ifdef WOLFSENTRY_WOLFCOSE
     const struct config_number *number =
@@ -479,24 +547,10 @@ static wolfsentry_errcode_t convert_uint16(
     if ((type != JSON_NUMBER) && (type != JSON_STRING))
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 
-    if (data_size >= sizeof buf)
+    if (data_size >= 8U)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    memcpy(buf, data, data_size);
-    buf[data_size] = 0;
-
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    errno = 0;
-#endif
-    conv = strtoul(buf, &endptr, 0);
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    if (errno != 0)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-
-    if ((size_t)(endptr - buf) != data_size)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-    if (conv > MAX_UINT_OF(*out))
-        WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
+    ret = parse_text_uint(data, data_size, MAX_UINT_OF(*out), &conv);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
     *out = (uint16_t)conv;
 #endif
 
@@ -514,9 +568,8 @@ static wolfsentry_errcode_t convert_uint8(
     uint8_t *out)
 {
 #ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
-    char buf[4];
-    char *endptr;
-    unsigned long conv;
+    uint64_t conv;
+    wolfsentry_errcode_t ret;
 #endif
 #ifdef WOLFSENTRY_WOLFCOSE
     const struct config_number *number =
@@ -538,24 +591,10 @@ static wolfsentry_errcode_t convert_uint8(
     if ((type != JSON_NUMBER) && (type != JSON_STRING))
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 
-    if (data_size >= sizeof buf)
+    if (data_size >= 4U)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    memcpy(buf, data, data_size);
-    buf[data_size] = 0;
-
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    errno = 0;
-#endif
-    conv = strtoul(buf, &endptr, 0);
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    if (errno != 0)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-
-    if ((size_t)(endptr - buf) != data_size)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-    if (conv > MAX_UINT_OF(*out))
-        WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
+    ret = parse_text_uint(data, data_size, MAX_UINT_OF(*out), &conv);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
     *out = (uint8_t)conv;
 #endif
 
@@ -645,8 +684,8 @@ static wolfsentry_errcode_t convert_wolfsentry_duration(
     wolfsentry_errcode_t ret;
     long conv;
 #ifndef WOLFSENTRY_CONFIG_NO_TEXT_NUMBERS
-    char buf[24];
-    char *endptr;
+    size_t consumed;
+    int64_t value;
 #endif
 #ifdef WOLFSENTRY_WOLFCOSE
     const struct config_number *number =
@@ -681,21 +720,13 @@ static wolfsentry_errcode_t convert_wolfsentry_duration(
     if ((type != JSON_STRING) && (type != JSON_NUMBER))
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 
-    if (data_size >= sizeof buf)
+    if (data_size >= 24U)
         WOLFSENTRY_ERROR_RETURN(NUMERIC_ARG_TOO_BIG);
-    memcpy(buf, data, data_size);
-    buf[data_size] = 0;
+    ret = parse_text_sint(data, data_size, &consumed, (int64_t)LONG_MIN, (int64_t)LONG_MAX, &value);
+    WOLFSENTRY_RERETURN_IF_ERROR(ret);
+    conv = (long)value;
 
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    errno = 0;
-#endif
-    conv = strtol(buf, &endptr, 0);
-#ifndef WOLFSENTRY_NO_ERRNO_H
-    if (errno != 0)
-        WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-
-    switch (*endptr) {
+    switch ((consumed < data_size) ? data[consumed] : 0) {
     case 'd':
         if (conv > LONG_MAX / 24 || conv < LONG_MIN / 24)
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
@@ -712,12 +743,12 @@ static wolfsentry_errcode_t convert_wolfsentry_duration(
         conv *= 60;
         /* fallthrough */
     case 's':
-        ++endptr;
+        ++consumed;
         break;
     default:
         break;
     }
-    if ((size_t)(endptr - buf) != data_size)
+    if (consumed != data_size)
         WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 #endif
     if ((ret = wolfsentry_interval_from_seconds(
@@ -1100,11 +1131,11 @@ static wolfsentry_errcode_t convert_sockaddr_address(
         ret = convert_uint32(type, data, data_size, &addr);
         WOLFSENTRY_RERETURN_IF_ERROR(ret);
 #else
-        char d_buf[13], *endptr;
-        unsigned long addr;
+        uint64_t addr;
+        wolfsentry_errcode_t ret;
         if ((type != JSON_STRING) && (type != JSON_NUMBER))
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-        if (data_size >= sizeof d_buf)
+        if (data_size >= 13U)
             WOLFSENTRY_ERROR_RETURN(STRING_ARG_TOO_LONG);
         if (sa->addr_len > 32) {
 #ifdef WOLFSENTRY_ADDR_BITMASK_MATCHING
@@ -1120,18 +1151,8 @@ static wolfsentry_errcode_t convert_sockaddr_address(
                 WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
             }
         }
-        memcpy(d_buf, data, data_size);
-        d_buf[data_size] = 0;
-#ifndef WOLFSENTRY_NO_ERRNO_H
-        errno = 0;
-#endif
-        addr = strtoul(d_buf, &endptr, 0);
-#ifndef WOLFSENTRY_NO_ERRNO_H
-        if (errno != 0)
-            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
-#endif
-        if ((size_t)(endptr - d_buf) != data_size)
-            WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
+        ret = parse_text_uint(data, data_size, MAX_UINT_OF(uint64_t), &addr);
+        WOLFSENTRY_RERETURN_IF_ERROR(ret);
         if (addr > MAX_UINT_OF(uint32_t))
             WOLFSENTRY_ERROR_RETURN(CONFIG_INVALID_VALUE);
 #endif
