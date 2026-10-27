@@ -1559,8 +1559,19 @@ static int test_static_routes(void) {
     int prefixlen;
     byte *private_data;
     size_t private_data_size;
+#if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_WOLFCOSE)
+    static const char padded_flag_name[64] = "af-wild";
+    wolfsentry_route_flags_t named_flag = WOLFSENTRY_ROUTE_FLAG_NONE;
+#endif
 
     WOLFSENTRY_THREAD_HEADER_CHECKED(WOLFSENTRY_THREAD_FLAG_NONE);
+
+#if defined(WOLFSENTRY_PROTOCOL_NAMES) || defined(WOLFSENTRY_JSON_DUMP_UTILS) || !defined(WOLFSENTRY_NO_JSON) || defined(WOLFSENTRY_WOLFCOSE)
+    /* a NUL inside the supplied length must not match a shorter name */
+    WOLFSENTRY_EXIT_UNLESS_EXPECTED_FAILURE(ITEM_NOT_FOUND, wolfsentry_route_flag_assoc_by_name(padded_flag_name, (int)sizeof "af-wild", &named_flag));
+    WOLFSENTRY_EXIT_ON_FAILURE(wolfsentry_route_flag_assoc_by_name(padded_flag_name, WOLFSENTRY_LENGTH_NULL_TERMINATED, &named_flag));
+    WOLFSENTRY_EXIT_ON_FALSE(named_flag == WOLFSENTRY_ROUTE_FLAG_SA_FAMILY_WILDCARD);
+#endif
 
     WOLFSENTRY_EXIT_ON_FAILURE(
         wolfsentry_init_ex(
